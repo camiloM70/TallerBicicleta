@@ -1,0 +1,161 @@
+@page "/registro"
+@inject NavigationManager NavigationManager
+
+<PageTitle>Registro - Taller Bicicleta</PageTitle>
+
+<div class="container-fluid vh-100 d-flex justify-content-center align-items-center">
+    <div class="row w-100">
+        <div class="col-md-8 col-lg-6 mx-auto">
+            <div class="card shadow">
+                <div class="card-body p-4">
+                    <div class="text-center mb-4">
+                        <h2 class="card-title text-primary">Taller Bicicleta</h2>
+                        <p class="text-muted">Registro de Nuevo Cliente</p>
+                    </div>
+
+                    <form>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="nombre" class="form-label">Nombre *</label>
+                                <input type="text" class="form-control" id="nombre" @bind="nombre" placeholder="Ingrese su nombre" />
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="apellido" class="form-label">Apellido *</label>
+                                <input type="text" class="form-control" id="apellido" @bind="apellido" placeholder="Ingrese su apellido" />
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="email" class="form-label">Correo Electrónico *</label>
+                                <input type="email" class="form-control" id="email" @bind="email" placeholder="correo@ejemplo.com" />
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="telefono" class="form-label">Teléfono</label>
+                                <input type="tel" class="form-control" id="telefono" @bind="telefono" placeholder="Número de teléfono" />
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="direccion" class="form-label">Dirección</label>
+                            <input type="text" class="form-control" id="direccion" @bind="direccion" placeholder="Su dirección" />
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="usuario" class="form-label">Usuario *</label>
+                                <input type="text" class="form-control" id="usuario" @bind="usuario" placeholder="Nombre de usuario" />
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="password" class="form-label">Contraseña *</label>
+                                <input type="password" class="form-control" id="password" @bind="password" placeholder="Contraseña" />
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="confirmarPassword" class="form-label">Confirmar Contraseña *</label>
+                            <input type="password" class="form-control" id="confirmarPassword" @bind="confirmarPassword" placeholder="Confirme su contraseña" />
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(mensajeError))
+                        {
+                            <div class="alert alert-danger" role="alert">
+                                @mensajeError
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrEmpty(mensajeExito))
+                        {
+                            <div class="alert alert-success" role="alert">
+                                @mensajeExito
+                            </div>
+                        }
+
+                        <div class="d-grid mb-3">
+                            <button type="button" class="btn btn-success" @onclick="RegistrarCliente">
+                                Registrarse
+                            </button>
+                        </div>
+                    </form>
+
+                    <hr>
+                    
+                    <div class="text-center">
+                        <p class="mb-2">¿Ya tienes una cuenta?</p>
+                        <a href="/login" class="btn btn-outline-primary">
+                            Iniciar Sesión
+                        </a>
+                    </div>
+
+                    <div class="text-center mt-3">
+                        <small class="text-muted">
+                            Los campos marcados con (*) son obligatorios
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string nombre = "";
+    private string apellido = "";
+    private string email = "";
+    private string telefono = "";
+    private string direccion = "";
+    private string usuario = "";
+    private string password = "";
+    private string confirmarPassword = "";
+    private string mensajeError = "";
+    private string mensajeExito = "";
+
+    private void RegistrarCliente()
+    {
+        mensajeError = "";
+        mensajeExito = "";
+
+        // Validaciones básicas
+        if (string.IsNullOrWhiteSpace(nombre) || string.IsNullOrWhiteSpace(apellido) || 
+            string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(usuario) || 
+            string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(confirmarPassword))
+        {
+            mensajeError = "Por favor, complete todos los campos obligatorios marcados con (*).";
+            return;
+        }
+
+        if (password != confirmarPassword)
+        {
+            mensajeError = "Las contraseñas no coinciden.";
+            return;
+        }
+
+        if (password.Length < 6)
+        {
+            mensajeError = "La contraseña debe tener al menos 6 caracteres.";
+            return;
+        }
+
+        if (!email.Contains("@"))
+        {
+            mensajeError = "Por favor, ingrese un correo electrónico válido.";
+            return;
+        }
+
+        // Aquí normalmente guardarías el usuario en la base de datos
+        // Por ahora simulamos un registro exitoso
+        mensajeExito = "¡Registro exitoso! Redirigiendo al panel del cliente...";
+        
+        // Simular un delay y redirigir
+        Task.Delay(2000).ContinueWith(_ =>
+        {
+            InvokeAsync(() =>
+            {
+                NavigationManager.NavigateTo("/cliente/dashboard");
+            });
+        });
+    }
+}

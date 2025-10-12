@@ -1,0 +1,103 @@
+@page "/"
+@page "/login"
+@inject NavigationManager NavigationManager
+
+<PageTitle>Iniciar Sesión - Taller Bicicleta</PageTitle>
+
+<div class="container-fluid vh-100 d-flex justify-content-center align-items-center">
+    <div class="row w-100">
+        <div class="col-md-6 col-lg-4 mx-auto">
+            <div class="card shadow">
+                <div class="card-body p-4">
+                    <div class="text-center mb-4">
+                        <h2 class="card-title text-primary">Taller Bicicleta</h2>
+                        <p class="text-muted">Iniciar Sesión</p>
+                    </div>
+
+                    <form>
+                        <div class="mb-3">
+                            <label for="usuario" class="form-label">Usuario</label>
+                            <input type="text" class="form-control" id="usuario" @bind="usuario" placeholder="Ingrese su usuario" />
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Contraseña</label>
+                            <input type="password" class="form-control" id="password" @bind="password" placeholder="Ingrese su contraseña" />
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(mensajeError))
+                        {
+                            <div class="alert alert-danger" role="alert">
+                                @mensajeError
+                            </div>
+                        }
+
+                        <div class="d-grid mb-3">
+                            <button type="button" class="btn btn-primary" @onclick="IniciarSesion">
+                                Iniciar Sesión
+                            </button>
+                        </div>
+                    </form>
+
+                    <hr>
+                    
+                    <div class="text-center">
+                        <p class="mb-2">¿No tienes cuenta?</p>
+                        <a href="/registro" class="btn btn-outline-secondary">
+                            Registrarse como Cliente
+                        </a>
+                    </div>
+
+                    <hr>
+                    
+                    <div class="text-center">
+                        <h6 class="text-muted mb-3">Usuarios de Prueba:</h6>
+                        <div class="row text-start">
+                            <div class="col-12 mb-2">
+                                <small class="text-muted">
+                                    <strong>Admin:</strong> admin / admin123<br>
+                                    <strong>Cliente:</strong> cliente / cliente123<br>
+                                    <strong>Empleado:</strong> empleado / empleado123
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string usuario = "";
+    private string password = "";
+    private string mensajeError = "";
+
+    private void IniciarSesion()
+    {
+        mensajeError = "";
+
+        if (string.IsNullOrWhiteSpace(usuario) || string.IsNullOrWhiteSpace(password))
+        {
+            mensajeError = "Por favor, ingrese usuario y contraseña.";
+            return;
+        }
+
+        // Validación de usuarios de prueba
+        switch (usuario.ToLower())
+        {
+            case "admin" when password == "admin123":
+                NavigationManager.NavigateTo("/admin/dashboard");
+                break;
+            case "cliente" when password == "cliente123":
+                NavigationManager.NavigateTo("/cliente/dashboard");
+                break;
+            case "empleado" when password == "empleado123":
+                NavigationManager.NavigateTo("/empleado/dashboard");
+                break;
+            default:
+                mensajeError = "Usuario o contraseña incorrectos.";
+                break;
+        }
+    }
+}
