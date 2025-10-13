@@ -27,3 +27,4 @@ global using static Microsoft.AspNetCore.Components.Web.RenderMode;
 // ===== PROYECTO ESPECÍFICO =====
 global using TallerBicicleta;
 global using TallerBicicleta.Components;
+global using TallerBicicleta.Models;
