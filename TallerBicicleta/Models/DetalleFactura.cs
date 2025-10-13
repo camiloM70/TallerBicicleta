@@ -1,6 +1,9 @@
-﻿namespace TallerBicicleta;
-
-public class DetalleFactura
+﻿namespace TallerBicicleta.Models
 {
+    public class DetalleFactura
+    {
+
+    }
 
 }
+

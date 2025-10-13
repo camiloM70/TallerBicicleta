@@ -1,6 +1,9 @@
-﻿namespace TallerBicicleta;
-
-public class Usuario
+﻿namespace TallerBicicleta.Models
 {
+    public class Usuario
+    {
+
+    }
 
 }
+

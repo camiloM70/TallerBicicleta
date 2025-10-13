@@ -1,6 +1,8 @@
-﻿namespace TallerBicicleta;
-
-public class SolicitudServicio
+﻿namespace TallerBicicleta.Models
 {
+    public class SolicitudServicio
+    {
+
+    }
 
 }

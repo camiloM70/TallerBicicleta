@@ -1,6 +1,7 @@
-﻿namespace TallerBicicleta;
-
-public class Abono
+﻿namespace TallerBicicleta.Models
 {
-
+    public class Abono
+    {
+        
+    }
 }
