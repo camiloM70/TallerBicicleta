@@ -1,3 +1,373 @@
-@page "/admin/productos"
-<PageTitle>Productos</PageTitle>
-<h3>Gestión de Productos</h3>
+@page "/productos"
+@attribute [Authorize(Roles = "Administrador")]
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject ILogger<Productos> Logger
+@inject NavigationManager Navigation
+
+<PageTitle>Gestión de Productos</PageTitle>
+
+<div class="page-container">
+    <div class="page-header">
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between align-items-center py-3">
+                <div>
+                    <button class="btn btn-light btn-sm me-3" @onclick='() => Navigation.NavigateTo("/admin")'>
+                        <i class="fas fa-arrow-left me-2"></i>Volver
+                    </button>
+                    <h1 class="d-inline mb-0">
+                        <i class="fas fa-box me-2"></i>Gestión de Productos
+                    </h1>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid px-4 mt-4">
+        <h1 class="page-title">
+            <i class="fas fa-box"></i> Gestión de Productos
+        </h1>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="fas fa-exclamation-circle"></i> @errorMessage
+                <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="fas fa-check-circle"></i> @successMessage
+                <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+            </div>
+        }
+
+        <div class="row mb-3">
+            <div class="col-md-12">
+                <button class="btn btn-primary btn-lg" @onclick="MostrarFormularioNuevo">
+                    <i class="fas fa-plus"></i> Nuevo Producto
+                </button>
+            </div>
+        </div>
+
+        @if (mostrarFormulario)
+        {
+            <div class="card mb-4 shadow">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="card-title mb-0">
+                        <i class="fas fa-@(esNuevo ? "plus" : "edit")"></i>
+                        @(esNuevo ? "Nuevo Producto" : "Editar Producto")
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <EditForm Model="@productoActual" OnValidSubmit="GuardarProducto">
+                        <DataAnnotationsValidator />
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Nombre:</label>
+                                    <InputText class="form-control form-control-lg" @bind-Value="productoActual.Nombre" placeholder="Nombre del producto" />
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label class="form-label">Precio:</label>
+                                    <InputNumber class="form-control form-control-lg" @bind-Value="productoActual.Precio" placeholder="0.00" />
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label class="form-label">Stock:</label>
+                                    <InputNumber class="form-control form-control-lg" @bind-Value="productoActual.Stock" placeholder="0" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Descripción:</label>
+                            <InputTextArea class="form-control" rows="3" @bind-Value="productoActual.Descripcion" placeholder="Descripción del producto (opcional)" />
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-save"></i> Guardar
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-lg" @onclick="CancelarFormulario">
+                                <i class="fas fa-times"></i> Cancelar
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        }
+
+        <div class="card shadow">
+            <div class="card-header bg-secondary text-white">
+                <h3 class="card-title mb-0">
+                    <i class="fas fa-list"></i> Lista de Productos
+                </h3>
+            </div>
+            <div class="card-body">
+                @if (cargando)
+                {
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                        <p class="mt-2">Cargando productos...</p>
+                    </div>
+                }
+                else if (productos == null || productos.Count == 0)
+                {
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> No hay productos registrados.
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Descripción</th>
+                                    <th>Precio</th>
+                                    <th>Stock</th>
+                                    <th>Estado</th>
+                                    <th class="text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var producto in productos)
+                                {
+                                    <tr>
+                                        <td><strong>@producto.Nombre</strong></td>
+                                        <td>@producto.Descripcion</td>
+                                        <td><span class="badge bg-success">$@producto.Precio.ToString("N2")</span></td>
+                                        <td>
+                                            <span class="badge @(producto.Stock > 0 ? "bg-primary" : "bg-danger")">
+                                                @producto.Stock unidades
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge @(producto.Activo ? "bg-success" : "bg-secondary")">
+                                                @(producto.Activo ? "Activo" : "Inactivo")
+                                            </span>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="btn-group" role="group">
+                                                <button class="btn btn-sm btn-warning"
+                                                        @onclick="() => EditarProducto(producto)"
+                                                        title="Editar">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-info"
+                                                        @onclick="() => MostrarModalStock(producto)"
+                                                        title="Ajustar Stock">
+                                                    <i class="fas fa-boxes"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-danger"
+                                                        @onclick="() => EliminarProducto(producto)"
+                                                        title="Eliminar">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .page-container {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    }
+
+    .page-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+        .page-header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: white;
+        }
+</style>
+
+@code {
+    private List<Producto> productos = new List<Producto>();
+    private Producto productoActual = new Producto();
+    private bool mostrarFormulario = false;
+    private bool esNuevo = true;
+    private bool cargando = false;
+    private string? errorMessage;
+    private string? successMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarProductos();
+    }
+
+    private async Task CargarProductos()
+    {
+        try
+        {
+            cargando = true;
+            var response = await Http.GetFromJsonAsync<List<Producto>>("api/producto");
+            productos = response ?? new List<Producto>();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error al cargar productos");
+            errorMessage = $"Error al cargar productos: {ex.Message}";
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+
+    private void MostrarFormularioNuevo()
+    {
+        productoActual = new Producto { Activo = true, Stock = 0, Precio = 0 };
+        esNuevo = true;
+        mostrarFormulario = true;
+        errorMessage = null;
+        successMessage = null;
+    }
+
+    private void EditarProducto(Producto producto)
+    {
+        productoActual = new Producto
+        {
+            Id = producto.Id,
+            Nombre = producto.Nombre,
+            Descripcion = producto.Descripcion,
+            Precio = producto.Precio,
+            Stock = producto.Stock,
+            Activo = producto.Activo
+        };
+        esNuevo = false;
+        mostrarFormulario = true;
+        errorMessage = null;
+        successMessage = null;
+    }
+
+    private async Task GuardarProducto()
+    {
+        try
+        {
+            HttpResponseMessage response;
+
+            if (esNuevo)
+            {
+                response = await Http.PostAsJsonAsync("api/producto", productoActual);
+            }
+            else
+            {
+                response = await Http.PutAsJsonAsync($"api/producto/{productoActual.Id}", productoActual);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = $"Producto {(esNuevo ? "creado" : "actualizado")} correctamente";
+                mostrarFormulario = false;
+                await CargarProductos();
+            }
+            else
+            {
+                var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+                errorMessage = $"Error al guardar: {error?.message ?? "Error desconocido"}";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error al guardar producto");
+            errorMessage = $"Error al guardar: {ex.Message}";
+        }
+    }
+
+    private async Task EliminarProducto(Producto producto)
+    {
+        bool confirmado = await JS.InvokeAsync<bool>("confirm",
+            $"¿Está seguro de eliminar el producto '{producto.Nombre}'?");
+
+        if (confirmado)
+        {
+            try
+            {
+                var response = await Http.DeleteAsync($"api/producto/{producto.Id}");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    successMessage = "Producto eliminado correctamente";
+                    await CargarProductos();
+                }
+                else
+                {
+                    var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+                    errorMessage = $"Error al eliminar: {error?.message ?? "Error desconocido"}";
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error al eliminar producto");
+                errorMessage = $"Error al eliminar: {ex.Message}";
+            }
+        }
+    }
+
+    private async Task MostrarModalStock(Producto producto)
+    {
+        var nuevoStock = await JS.InvokeAsync<string>("prompt",
+            $"Ingrese el nuevo stock para '{producto.Nombre}':",
+            producto.Stock.ToString());
+
+        if (!string.IsNullOrEmpty(nuevoStock) && int.TryParse(nuevoStock, out int stock))
+        {
+            try
+            {
+                var response = await Http.PutAsJsonAsync($"api/producto/{producto.Id}/stock", stock);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    successMessage = "Stock actualizado correctamente";
+                    await CargarProductos();
+                }
+                else
+                {
+                    var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+                    errorMessage = $"Error al actualizar stock: {error?.message ?? "Error desconocido"}";
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error al actualizar stock");
+                errorMessage = $"Error al actualizar stock: {ex.Message}";
+            }
+        }
+    }
+
+    private void CancelarFormulario()
+    {
+        mostrarFormulario = false;
+        productoActual = new Producto();
+    }
+
+    private class ErrorResponse
+    {
+        public string? message { get; set; }
+    }
+}

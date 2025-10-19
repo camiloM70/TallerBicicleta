@@ -1,3 +1,299 @@
-@page "/cliente/factura-detalle"
-<PageTitle>Detalle de Factura</PageTitle>
-<h3>Detalle de Factura</h3>
+@page "/cliente/factura/{FacturaId}"
+@attribute [Authorize(Roles = "Cliente")]
+@inject HttpClient Http
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@inject CodigoBarrasService CodigoBarrasService
+
+<div class="container-fluid min-vh-100 bg-light py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-10 col-xl-8">
+            @if (cargando)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <p class="mt-3 text-muted">Cargando detalles de la factura...</p>
+                </div>
+            }
+            else if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i> @errorMessage
+                </div>
+                <button class="btn btn-primary" @onclick="Volver">
+                    <i class="bi bi-arrow-left"></i> Volver a Mis Facturas
+                </button>
+            }
+            else if (factura != null)
+            {
+                <!-- Header con botón volver -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="fw-bold text-primary mb-0">
+                        <i class="bi bi-receipt-cutoff"></i> Detalles de la Factura
+                    </h2>
+                    <button class="btn btn-outline-secondary" @onclick="Volver">
+                        <i class="bi bi-arrow-left"></i> Volver
+                    </button>
+                </div>
+
+                <!-- Factura Card Principal -->
+                <div class="card shadow-lg border-0 mb-4">
+                    <div class="card-header bg-primary text-white py-3">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <h4 class="mb-0 fw-bold">
+                                    <i class="bi bi-receipt"></i> @factura.NumeroFactura
+                                </h4>
+                            </div>
+                            <div class="col-md-6 text-md-end mt-2 mt-md-0">
+                                <span class="badge @(factura.Pagada ? "bg-success" : "bg-warning text-dark") fs-6 px-3 py-2">
+                                    @if (factura.Pagada)
+                                    {
+                                        <i class="bi bi-check-circle-fill"></i>
+                                        <text> PAGADA</text>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-clock-fill"></i>
+                                        <text> PENDIENTE</text>
+                                    }
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-body p-4">
+                        <!-- Información General -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <h5 class="text-primary mb-3">
+                                    <i class="bi bi-info-circle"></i> Información General
+                                </h5>
+                                <div class="mb-3">
+                                    <label class="text-muted small mb-1">Número:</label>
+                                    <p class="mb-0 fw-bold">@factura.NumeroFactura</p>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="text-muted small mb-1">Fecha de Emisión:</label>
+                                    <p class="mb-0 fw-bold">
+                                        <i class="bi bi-calendar3"></i> @factura.FechaEmision.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                    </p>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="text-muted small mb-1">Servicio:</label>
+                                    <p class="mb-0 fw-bold">
+                                        <i class="bi bi-tools"></i> @factura.ServicioNombre
+                                    </p>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="text-muted small mb-1">Empleado:</label>
+                                    <p class="mb-0 fw-bold">
+                                        <i class="bi bi-person-badge"></i> @factura.EmpleadoNombre
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Código de Barras -->
+                            <div class="col-md-6 text-center">
+                                <h5 class="text-primary mb-3">
+                                    <i class="bi bi-upc-scan"></i> Código de Barras
+                                </h5>
+                                <div class="bg-white border rounded p-3">
+                                    @if (!string.IsNullOrEmpty(codigoBarrasBase64))
+                                    {
+                                        <img src="data:image/png;base64,@codigoBarrasBase64"
+                                             alt="Código de Barras"
+                                             style="max-width: 100%; height: auto;" />
+                                    }
+                                    else
+                                    {
+                                        <p class="text-muted">Generando código de barras...</p>
+                                    }
+                                </div>
+                                <p class="text-muted small mt-2 fw-bold">@factura.NumeroFactura</p>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- Productos Utilizados -->
+                        <h5 class="text-primary mb-3">
+                            <i class="bi bi-box-seam"></i> Productos Utilizados
+                        </h5>
+
+                        @if (factura.Detalles != null && factura.Detalles.Any())
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Producto</th>
+                                            <th class="text-center">Cantidad</th>
+                                            <th class="text-end">Precio Unit.</th>
+                                            <th class="text-end">Subtotal</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var detalle in factura.Detalles)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <i class="bi bi-box text-primary"></i>
+                                                    <strong>@detalle.ProductoNombre</strong>
+                                                </td>
+                                                <td class="text-center">
+                                                    <span class="badge bg-secondary">@detalle.Cantidad</span>
+                                                </td>
+                                                <td class="text-end">@detalle.PrecioUnitario.ToString("C2")</td>
+                                                <td class="text-end fw-bold">@detalle.Subtotal.ToString("C2")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i> No se utilizaron productos en este servicio
+                            </div>
+                        }
+
+                        <hr class="my-4">
+
+                        <!-- Totales -->
+                        <div class="row">
+                            <div class="col-md-6 offset-md-6">
+                                <div class="card bg-light border-0">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span class="text-muted">Total:</span>
+                                            <span class="fw-bold fs-5">@factura.Total.ToString("C2")</span>
+                                        </div>
+                                        @if (!factura.Pagada)
+                                        {
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <span class="text-muted">Pagado:</span>
+                                                <span class="text-success fw-bold">@((factura.Total - factura.Saldo).ToString("C2"))</span>
+                                            </div>
+                                            <hr>
+                                            <div class="d-flex justify-content-between">
+                                                <span class="text-danger fw-bold">Saldo Pendiente:</span>
+                                                <span class="text-danger fw-bold fs-4">@factura.Saldo.ToString("C2")</span>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="text-center mt-2">
+                                                <span class="badge bg-success fs-6 px-3 py-2">
+                                                    <i class="bi bi-check-circle-fill"></i> FACTURA PAGADA
+                                                </span>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Botones de acción -->
+                        <div class="d-flex gap-2 justify-content-end mt-4">
+                            <button class="btn btn-outline-primary" @onclick="ImprimirFactura">
+                                <i class="bi bi-printer"></i> Imprimir
+                            </button>
+                            @if (!factura.Pagada)
+                            {
+                                <button class="btn btn-success" @onclick="IrAbonar">
+                                    <i class="bi bi-credit-card"></i> Realizar Pago
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    .table th {
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        letter-spacing: 0.5px;
+    }
+
+    .card {
+        transition: all 0.3s ease;
+    }
+
+    @@media print {
+        .btn, .no-print {
+            display: none !important;
+        }
+    }
+</style>
+
+@code {
+    [Parameter]
+    public string? FacturaId { get; set; }
+
+    private Factura? factura;
+    private bool cargando = true;
+    private string? errorMessage;
+    private string? codigoBarrasBase64;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarFactura();
+    }
+
+    private async Task CargarFactura()
+    {
+        try
+        {
+            cargando = true;
+            var response = await Http.GetAsync($"api/factura/{FacturaId}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                factura = await response.Content.ReadFromJsonAsync<Factura>();
+
+                // Generar código de barras
+                if (factura != null && !string.IsNullOrEmpty(factura.NumeroFactura))
+                {
+                    codigoBarrasBase64 = CodigoBarrasService.GenerarCodigoBarrasBase64(factura.NumeroFactura);
+                }
+            }
+            else
+            {
+                errorMessage = "No se pudo cargar la factura";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+
+    private void Volver()
+    {
+        Navigation.NavigateTo("/cliente/facturas");
+    }
+
+    private void IrAbonar()
+    {
+        Navigation.NavigateTo($"/cliente/abonar/{FacturaId}");
+    }
+
+    private void ImprimirFactura()
+    {
+        JSRuntime.InvokeVoidAsync("window.print");
+    }
+}

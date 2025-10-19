@@ -1,3 +1,465 @@
-@page "/cliente/abonar"
-<PageTitle>Abonar</PageTitle>
-<h3>Realizar Abono</h3>
+@page "/cliente/abonar/{FacturaId?}"
+@attribute [Authorize(Roles = "Cliente")]
+@inject HttpClient Http
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<div class="container-fluid min-vh-100 bg-light py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-8">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="fw-bold text-primary mb-1"> Abonar a Factura</h2>
+                    <p class="text-muted mb-0">Realiza pagos parciales o totales</p>
+                </div>
+                <button class="btn btn-outline-secondary" @onclick="Volver">
+                    <i class="bi bi-arrow-left"></i> Volver
+                </button>
+            </div>
+
+            @if (cargando)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                </div>
+            }
+            else if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i> @errorMessage
+                </div>
+                <button class="btn btn-primary" @onclick='() => Navigation.NavigateTo("/cliente/facturas")'>
+                    Ver Mis Facturas
+                </button>
+            }
+            else if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="alert alert-success">
+                    <i class="bi bi-check-circle"></i> @successMessage
+                </div>
+                <button class="btn btn-primary" @onclick='() => Navigation.NavigateTo("/cliente/facturas")'>
+                    Ver Mis Facturas
+                </button>
+            }
+            else
+            {
+                <!-- Seleccionar Factura -->
+                @if (string.IsNullOrEmpty(FacturaId))
+                {
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title mb-3">Selecciona una Factura</h5>
+
+                            @if (!facturasPendientes.Any())
+                            {
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle"></i> No tienes facturas pendientes de pago
+                                </div>
+                                <button class="btn btn-primary" @onclick='() => Navigation.NavigateTo("/cliente/facturas")'>
+                                    Ver Mis Facturas
+                                </button>
+                            }
+                            else
+                            {
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Factura a Pagar</label>
+                                    <select class="form-select form-select-lg" @bind="facturaSeleccionadaId">
+                                        <option value="">-- Selecciona una factura --</option>
+                                        @foreach (var factura in facturasPendientes)
+                                        {
+                                            <option value="@factura.Id">
+                                                @factura.NumeroFactura - Saldo: $@factura.Saldo.ToString("N2") - @factura.ServicioNombre
+                                            </option>
+                                        }
+                                    </select>
+                                </div>
+                                <button class="btn btn-primary btn-lg"
+                                        disabled="@(string.IsNullOrEmpty(facturaSeleccionadaId))"
+                                        @onclick="CargarFacturaSeleccionada">
+                                    Continuar <i class="bi bi-arrow-right"></i>
+                                </button>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <!-- Detalles de la Factura y Pago -->
+                @if (facturaActual != null)
+                {
+                    <div class="row g-3">
+                        <!-- Información de la Factura -->
+                        <div class="col-12">
+                            <div class="card shadow-sm border-primary">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0"><i class="bi bi-receipt"></i> Detalles de la Factura</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <p><strong>Número:</strong> @facturaActual.NumeroFactura</p>
+                                            <p><strong>Fecha:</strong> @facturaActual.FechaEmision.ToLocalTime().ToString("dd/MM/yyyy")</p>
+                                            <p><strong>Empleado:</strong> @facturaActual.EmpleadoNombre</p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <p><strong>Servicio:</strong> @facturaActual.ServicioNombre</p>
+                                            <div class="bg-light p-3 rounded mt-2">
+                                                <div class="d-flex justify-content-between mb-2">
+                                                    <span>Total:</span>
+                                                    <span class="fw-bold">@facturaActual.Total.ToString("C2")</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between mb-2">
+                                                    <span>Pagado:</span>
+                                                    <span class="text-success fw-bold">@((facturaActual.Total - facturaActual.Saldo).ToString("C2"))</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between">
+                                                    <span class="fw-bold">Saldo Pendiente:</span>
+                                                    <span class="text-danger fw-bold fs-4">@facturaActual.Saldo.ToString("C2")</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    @if (facturaActual.Detalles != null && facturaActual.Detalles.Any())
+                                    {
+                                        <hr />
+                                        <h6 class="mb-3">Productos Utilizados:</h6>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th>Producto</th>
+                                                        <th class="text-center">Cantidad</th>
+                                                        <th class="text-end">Precio Unit.</th>
+                                                        <th class="text-end">Subtotal</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var detalle in facturaActual.Detalles)
+                                                    {
+                                                        <tr>
+                                                            <td>@detalle.ProductoNombre</td>
+                                                            <td class="text-center">@detalle.Cantidad</td>
+                                                            <td class="text-end">@detalle.PrecioUnitario.ToString("C2")</td>
+                                                            <td class="text-end">@detalle.Subtotal.ToString("C2")</td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Formulario de Pago -->
+                        <div class="col-12">
+                            <div class="card shadow-sm border-success">
+                                <div class="card-header bg-success text-white">
+                                    <h5 class="mb-0"><i class="bi bi-credit-card"></i> Realizar Pago</h5>
+                                </div>
+                                <div class="card-body">
+                                    <!-- Monto a Pagar -->
+                                    <div class="mb-4">
+                                        <label class="form-label fw-bold">Monto a Pagar</label>
+                                        <div class="input-group input-group-lg">
+                                            <span class="input-group-text bg-success text-white">$</span>
+                                            <input type="number"
+                                                   class="form-control"
+                                                   @bind="montoAPagar"
+                                                   min="0.01"
+                                                   max="@facturaActual.Saldo"
+                                                   step="0.01"
+                                                   placeholder="0.00" />
+                                        </div>
+                                        <small class="text-muted">
+                                            Máximo: $@facturaActual.Saldo.ToString("N2")
+                                        </small>
+                                        <div class="mt-2">
+                                            <button class="btn btn-outline-secondary btn-sm me-2"
+                                                    @onclick="() => montoAPagar = facturaActual.Saldo">
+                                                Pagar Todo
+                                            </button>
+                                            <button class="btn btn-outline-secondary btn-sm"
+                                                    @onclick="() => montoAPagar = facturaActual.Saldo / 2">
+                                                Pagar Mitad
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Método de Pago -->
+                                    <div class="mb-4">
+                                        <label class="form-label fw-bold">Método de Pago</label>
+                                        <div class="row g-2">
+                                            <div class="col-md-4">
+                                                <div class="form-check card p-3 @(metodoPago == "tarjeta" ? "border-success bg-light" : "")">
+                                                    <input class="form-check-input" type="radio"
+                                                           name="metodoPago"
+                                                           id="tarjeta"
+                                                           value="tarjeta"
+                                                           @onchange='() => metodoPago = "tarjeta"'
+                                                           checked="@(metodoPago == "tarjeta")" />
+                                                    <label class="form-check-label" for="tarjeta">
+                                                        <i class="bi bi-credit-card text-primary"></i> Tarjeta de Crédito/Débito
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="form-check card p-3 @(metodoPago == "pse" ? "border-success bg-light" : "")">
+                                                    <input class="form-check-input" type="radio"
+                                                           name="metodoPago"
+                                                           id="pse"
+                                                           value="pse"
+                                                           @onchange='() => metodoPago = "pse"' />
+                                                    <label class="form-check-label" for="pse">
+                                                        <i class="bi bi-bank text-success"></i> PSE
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="form-check card p-3 @(metodoPago == "efectivo" ? "border-success bg-light" : "")">
+                                                    <input class="form-check-input" type="radio"
+                                                           name="metodoPago"
+                                                           id="efectivo"
+                                                           value="efectivo"
+                                                           @onchange='() => metodoPago = "efectivo"' />
+                                                    <label class="form-check-label" for="efectivo">
+                                                        <i class="bi bi-cash text-warning"></i> Efectivo
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    @if (validationError != null)
+                                    {
+                                        <div class="alert alert-warning">
+                                            <i class="bi bi-exclamation-triangle"></i> @validationError
+                                        </div>
+                                    }
+
+                                    <!-- Botones de Acción -->
+                                    <div class="d-grid gap-2">
+                                        <button class="btn btn-success btn-lg"
+                                                @onclick="ProcesarPago"
+                                                disabled="@procesando">
+                                            @if (procesando)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                                <text>Procesando...</text>
+                                            }
+                                            else
+                                            {
+                                                <i class="bi bi-check-circle"></i>
+                                                <text> Confirmar Pago de $@montoAPagar.ToString("N2")</text>
+                                            }
+                                        </button>
+                                        <button class="btn btn-outline-secondary"
+                                                @onclick="CancelarPago"
+                                                disabled="@procesando">
+                                            Cancelar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string? FacturaId { get; set; }
+
+    private List<Factura> facturasPendientes = new List<Factura>();
+    private Factura? facturaActual;
+    private string? facturaSeleccionadaId;
+    private double montoAPagar = 0;
+    private string metodoPago = "tarjeta";
+    private bool cargando = true;
+    private bool procesando = false;
+    private string? errorMessage;
+    private string? successMessage;
+    private string? validationError;
+    private string? clienteId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                clienteId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+                if (!string.IsNullOrEmpty(clienteId))
+                {
+                    await CargarFacturasPendientes();
+
+                    if (!string.IsNullOrEmpty(FacturaId))
+                    {
+                        facturaSeleccionadaId = FacturaId;
+                        await CargarFacturaSeleccionada();
+                    }
+                }
+                else
+                {
+                    errorMessage = "No se pudo obtener el ID del cliente";
+                }
+            }
+            else
+            {
+                Navigation.NavigateTo("/login");
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar: {ex.Message}";
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+
+    private async Task CargarFacturasPendientes()
+    {
+        try
+        {
+            var response = await Http.GetAsync($"api/factura/cliente/{clienteId}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var todasFacturas = await response.Content.ReadFromJsonAsync<List<Factura>>() ?? new List<Factura>();
+                facturasPendientes = todasFacturas.Where(f => !f.Pagada && f.Saldo > 0).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar facturas: {ex.Message}";
+        }
+    }
+
+    private async Task CargarFacturaSeleccionada()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(facturaSeleccionadaId))
+                return;
+
+            var response = await Http.GetAsync($"api/factura/{facturaSeleccionadaId}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                facturaActual = await response.Content.ReadFromJsonAsync<Factura>();
+
+                if (facturaActual != null)
+                {
+                    if (facturaActual.Pagada)
+                    {
+                        errorMessage = "Esta factura ya está pagada completamente";
+                        facturaActual = null;
+                    }
+                    else
+                    {
+                        montoAPagar = facturaActual.Saldo;
+                    }
+                }
+            }
+            else
+            {
+                errorMessage = "No se pudo cargar la factura";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    private async Task ProcesarPago()
+    {
+        validationError = null;
+
+        // Validaciones
+        if (facturaActual == null)
+        {
+            validationError = "No hay factura seleccionada";
+            return;
+        }
+
+        if (montoAPagar <= 0)
+        {
+            validationError = "El monto debe ser mayor a cero";
+            return;
+        }
+
+        if (montoAPagar > facturaActual.Saldo)
+        {
+            validationError = $"El monto no puede ser mayor al saldo pendiente (${facturaActual.Saldo:N2})";
+            return;
+        }
+
+        try
+        {
+            procesando = true;
+
+            // Crear objeto de abono
+            var abono = new
+            {
+                Monto = montoAPagar
+            };
+
+            var response = await Http.PostAsJsonAsync($"api/factura/{facturaActual.Id}/abono", abono);
+
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = $"¡Pago realizado exitosamente! Monto: ${montoAPagar:N2}";
+                facturaActual = null;
+
+                await Task.Delay(2000);
+                Navigation.NavigateTo("/cliente/facturas");
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                validationError = $"Error al procesar pago: {error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            validationError = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            procesando = false;
+        }
+    }
+
+    private void CancelarPago()
+    {
+        if (string.IsNullOrEmpty(FacturaId))
+        {
+            facturaActual = null;
+            facturaSeleccionadaId = null;
+            montoAPagar = 0;
+        }
+        else
+        {
+            Navigation.NavigateTo("/cliente/facturas");
+        }
+    }
+
+    private void Volver()
+    {
+        Navigation.NavigateTo("/cliente/facturas");
+    }
+}

@@ -1,103 +1,227 @@
 @page "/"
 @page "/login"
-@inject NavigationManager NavigationManager
+@inject NavigationManager Navigation
+@inject ILogger<Login> Logger
+@inject AuthService AuthService
+@using TallerBicicleta.Models
+@using TallerBicicleta.Services
+@inject CustomAuthStateProvider AuthStateProvider
 
-<PageTitle>Iniciar Sesión - Taller Bicicleta</PageTitle>
+<PageTitle>Iniciar Sesión</PageTitle>
 
-<div class="container-fluid vh-100 d-flex justify-content-center align-items-center">
-    <div class="row w-100">
-        <div class="col-md-6 col-lg-4 mx-auto">
-            <div class="card shadow">
-                <div class="card-body p-4">
-                    <div class="text-center mb-4">
-                        <h2 class="card-title text-primary">Taller Bicicleta</h2>
-                        <p class="text-muted">Iniciar Sesión</p>
-                    </div>
+<div class="login-container">
+    <div class="login-card">
+        <div class="login-header">
+            <i class="fas fa-user-circle fa-4x mb-3"></i>
+            <h2>Sistema de Gestión</h2>
+            <p class="text-muted">Inicie sesión para continuar</p>
+        </div>
 
-                    <form>
-                        <div class="mb-3">
-                            <label for="usuario" class="form-label">Usuario</label>
-                            <input type="text" class="form-control" id="usuario" @bind="usuario" placeholder="Ingrese su usuario" />
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="password" class="form-label">Contraseña</label>
-                            <input type="password" class="form-control" id="password" @bind="password" placeholder="Ingrese su contraseña" />
-                        </div>
-
-                        @if (!string.IsNullOrEmpty(mensajeError))
-                        {
-                            <div class="alert alert-danger" role="alert">
-                                @mensajeError
-                            </div>
-                        }
-
-                        <div class="d-grid mb-3">
-                            <button type="button" class="btn btn-primary" @onclick="IniciarSesion">
-                                Iniciar Sesión
-                            </button>
-                        </div>
-                    </form>
-
-                    <hr>
-                    
-                    <div class="text-center">
-                        <p class="mb-2">¿No tienes cuenta?</p>
-                        <a href="/registro" class="btn btn-outline-secondary">
-                            Registrarse como Cliente
-                        </a>
-                    </div>
-
-                    <hr>
-                    
-                    <div class="text-center">
-                        <h6 class="text-muted mb-3">Usuarios de Prueba:</h6>
-                        <div class="row text-start">
-                            <div class="col-12 mb-2">
-                                <small class="text-muted">
-                                    <strong>Admin:</strong> admin / admin123<br>
-                                    <strong>Cliente:</strong> cliente / cliente123<br>
-                                    <strong>Empleado:</strong> empleado / empleado123
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger" role="alert">
+                <i class="fas fa-exclamation-triangle"></i> @errorMessage
             </div>
+        }
+
+        <EditForm Model="@loginModel" OnValidSubmit="HandleLogin">
+            <div class="mb-3">
+                <label class="form-label">
+                    <i class="fas fa-user"></i> Usuario
+                </label>
+                <InputText class="form-control form-control-lg" 
+                           @bind-Value="loginModel.NombreUsuario" 
+                           placeholder="Ingrese su usuario" 
+                           disabled="@isLoading" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">
+                    <i class="fas fa-lock"></i> Contraseña
+                </label>
+                <InputText type="password" 
+                           class="form-control form-control-lg" 
+                           @bind-Value="loginModel.Password" 
+                           placeholder="Ingrese su contraseña" 
+                           disabled="@isLoading" />
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg w-100" disabled="@isLoading">
+                @if (isLoading)
+                {
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                    <text>Iniciando sesión...</text>
+                }
+                else
+                {
+                    <i class="fas fa-sign-in-alt me-2"></i>
+                    <text>Iniciar Sesión</text>
+                }
+            </button>
+        </EditForm>
+
+        <div class="mt-3 text-center">
+            <p class="text-muted mb-0">¿No tienes cuenta?</p>
+            <a href="/registro" class="btn btn-link">Regístrate aquí</a>
+        </div>
+
+        <div class="mt-4 text-center">
+            <small class="text-muted">
+                <i class="fas fa-info-circle"></i> 
+                Credenciales Admin: <strong>admin</strong> / <strong>2345</strong>
+            </small>
         </div>
     </div>
 </div>
+<style>
+    .login-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px;
+    }
 
+    .login-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        padding: 40px;
+        width: 100%;
+        max-width: 450px;
+    }
+
+    .login-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+        .login-header i {
+            color: #667eea;
+        }
+
+        .login-header h2 {
+            color: #333;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+    .form-label {
+        font-weight: 600;
+        color: #555;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        padding: 12px;
+        font-weight: 600;
+    }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+</style>
 @code {
-    private string usuario = "";
-    private string password = "";
-    private string mensajeError = "";
+    private LoginModel loginModel = new LoginModel();
+    private string? errorMessage;
+    private bool isLoading = false;
 
-    private void IniciarSesion()
+    private async Task HandleLogin()
     {
-        mensajeError = "";
-
-        if (string.IsNullOrWhiteSpace(usuario) || string.IsNullOrWhiteSpace(password))
+        try
         {
-            mensajeError = "Por favor, ingrese usuario y contraseña.";
-            return;
-        }
+            isLoading = true;
+            errorMessage = null;
 
-        // Validación de usuarios de prueba
-        switch (usuario.ToLower())
-        {
-            case "admin" when password == "admin123":
-                NavigationManager.NavigateTo("/admin/dashboard");
-                break;
-            case "cliente" when password == "cliente123":
-                NavigationManager.NavigateTo("/cliente/dashboard");
-                break;
-            case "empleado" when password == "empleado123":
-                NavigationManager.NavigateTo("/empleado/dashboard");
-                break;
-            default:
-                mensajeError = "Usuario o contraseña incorrectos.";
-                break;
+            // Validaciones básicas
+            if (string.IsNullOrWhiteSpace(loginModel.NombreUsuario))
+            {
+                errorMessage = "El nombre de usuario es requerido";
+                return;
+            }
+
+            // Validación contra XSS
+            if (ContieneCaracteresInseguros(loginModel.NombreUsuario))
+            {
+                errorMessage = "El nombre de usuario contiene caracteres no permitidos";
+                Logger.LogWarning($"Intento de XSS detectado en login: {loginModel.NombreUsuario}");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(loginModel.Password))
+            {
+                errorMessage = "La contraseña es requerida";
+                return;
+            }
+
+            // Intentar hacer login
+            var usuario = await AuthService.LoginAsync(loginModel.NombreUsuario, loginModel.Password);
+
+            if (usuario == null)
+            {
+                errorMessage = "Usuario o contraseña incorrectos";
+                Logger.LogWarning($"Intento de login fallido para usuario: {loginModel.NombreUsuario}");
+                return;
+            }
+
+            // Marcar usuario como autenticado
+            AuthStateProvider.MarkUserAsAuthenticated(usuario);
+            Logger.LogInformation($"Login exitoso: {usuario.NombreUsuario} - Rol: {usuario.RolUsuario}");
+
+            // Pequeña pausa para asegurar que el estado se actualice
+            await Task.Delay(100);
+
+            // Redirigir según el rol (SIN forceLoad para mantener el estado)
+            switch (usuario.RolUsuario)
+            {
+                case RolUsuario.Administrador:
+                    Logger.LogInformation("Redirigiendo a /admin");
+                    Navigation.NavigateTo("/admin", forceLoad: false);
+                    break;
+                case RolUsuario.Empleado:
+                    Logger.LogInformation("Redirigiendo a /empleado");
+                    Navigation.NavigateTo("/empleado", forceLoad: false);
+                    break;
+                case RolUsuario.Cliente:
+                    Logger.LogInformation("Redirigiendo a /cliente");
+                    Navigation.NavigateTo("/cliente", forceLoad: false);
+                    break;
+                default:
+                    Navigation.NavigateTo("/", forceLoad: false);
+                    break;
+            }
         }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error durante el login");
+            errorMessage = $"Error al iniciar sesión: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    // Método para detectar caracteres peligrosos (XSS)
+    private bool ContieneCaracteresInseguros(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return false;
+
+        // Lista de caracteres peligrosos para XSS
+        char[] caracteresInseguros = { '<', '>', '"', '\'', '/', '\\', '&', ';', '(', ')', '{', '}', '[', ']' };
+        
+        return input.IndexOfAny(caracteresInseguros) >= 0;
+    }
+
+    private class LoginModel
+    {
+        public string NombreUsuario { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
     }
 }

@@ -1,3 +1,248 @@
 @page "/cliente/solicitar-servicio"
+@attribute [Authorize(Roles = "Cliente")]
+@inject HttpClient Http
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject ILogger<SolicitarServicio> Logger
+
 <PageTitle>Solicitar Servicio</PageTitle>
-<h3>Formulario de Solicitud</h3>
+
+<div class="page-container">
+    <!-- Header -->
+    <div class="page-header">
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between align-items-center py-3">
+                <div>
+                    <button class="btn btn-light btn-sm me-3" @onclick='() => Navigation.NavigateTo("/cliente")'>
+                        <i class="fas fa-arrow-left me-2"></i>Volver
+                    </button>
+                    <h1 class="d-inline mb-0">
+                        <i class="fas fa-plus-circle me-2"></i>Solicitar Servicio
+                    </h1>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido -->
+    <div class="container-fluid px-4 mt-4">
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible fade show">
+                <i class="fas fa-exclamation-circle me-2"></i>@errorMessage
+                <button type="button" class="btn-close" @onclick="@(() => errorMessage = null)"></button>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="alert alert-success alert-dismissible fade show">
+                <i class="fas fa-check-circle me-2"></i>@successMessage
+                <button type="button" class="btn-close" @onclick="@(() => successMessage = null)"></button>
+            </div>
+        }
+
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card shadow-lg border-0">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0"><i class="fas fa-clipboard-list me-2"></i>Nueva Solicitud de Servicio</h4>
+                    </div>
+                    <div class="card-body p-4">
+                        <EditForm Model="@solicitud" OnValidSubmit="EnviarSolicitud">
+                            <DataAnnotationsValidator />
+
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">
+                                    <i class="fas fa-calendar me-2"></i>Fecha Deseada
+                                </label>
+                                <input type="date" class="form-control form-control-lg" @bind="fechaDeseada" required />
+                                <small class="text-muted">Fecha en la que desea que se realice el servicio</small>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">
+                                    <i class="fas fa-align-left me-2"></i>Descripción del Problema/Necesidad
+                                </label>
+                                <textarea class="form-control" rows="4" @bind="solicitud.Descripcion"
+                                          placeholder="Describa brevemente qué necesita..." required></textarea>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">
+                                    <i class="fas fa-info-circle me-2"></i>Detalles Adicionales (Opcional)
+                                </label>
+                                <textarea class="form-control" rows="3" @bind="solicitud.Detalle"
+                                          placeholder="Información adicional que pueda ser útil..."></textarea>
+                            </div>
+
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-success btn-lg" disabled="@enviando">
+                                    @if (enviando)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                    }
+                                    else
+                                    {
+                                        <i class="fas fa-paper-plane me-2"></i>
+                                    }
+                                    Enviar Solicitud
+                                </button>
+                                <button type="button" class="btn btn-secondary" @onclick='() => Navigation.NavigateTo("/cliente")'>
+                                    <i class="fas fa-times me-2"></i>Cancelar
+                                </button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .page-container {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #e0f7fa 0%, #80deea 100%);
+    }
+
+    .page-header {
+        background: linear-gradient(135deg, #00acc1 0%, #00838f 100%);
+        color: white;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+        .page-header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: white;
+        }
+
+    .card {
+        border-radius: 15px;
+        overflow: hidden;
+    }
+
+    .card-header {
+        padding: 1.5rem;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: #00acc1;
+        box-shadow: 0 0 0 0.2rem rgba(0, 172, 193, 0.25);
+    }
+
+    .btn-success {
+        background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+        border: none;
+        font-weight: 600;
+    }
+
+        .btn-success:hover {
+            background: linear-gradient(135deg, #388e3c 0%, #4caf50 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+</style>
+
+@code {
+    private SolicitudServicio solicitud = new SolicitudServicio();
+    private DateTime fechaDeseada = DateTime.Today;
+    private bool enviando = false;
+    private string? errorMessage;
+    private string? successMessage;
+    private string? clienteId;
+    private string? clienteNombre;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ObtenerDatosCliente();
+    }
+
+    private async Task ObtenerDatosCliente()
+    {
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                clienteId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                clienteNombre = user.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+
+                Logger.LogInformation($"Cliente autenticado: {clienteNombre} (ID: {clienteId})");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error al obtener datos del cliente");
+        }
+    }
+
+    private async Task EnviarSolicitud()
+    {
+        try
+        {
+            enviando = true;
+            errorMessage = null;
+            successMessage = null;
+
+            // Validar descripción
+            if (string.IsNullOrWhiteSpace(solicitud.Descripcion))
+            {
+                errorMessage = "La descripción es obligatoria";
+                return;
+            }
+
+            // Completar datos de la solicitud
+            solicitud.ClienteId = clienteId ?? string.Empty;
+            solicitud.ClienteNombre = clienteNombre;
+            solicitud.ServicioId = null; // El empleado asignará el servicio después
+            solicitud.ServicioNombre = "Por definir"; // Temporal hasta que el empleado lo defina
+            solicitud.Estado = (int)EstadoSolicitud.Pendiente;
+            solicitud.FechaSolicitud = DateTime.UtcNow;
+
+            // Agregar la fecha deseada al inicio del detalle
+            var detalleCompleto = $"Fecha deseada: {fechaDeseada:dd/MM/yyyy}\n\n";
+            if (!string.IsNullOrWhiteSpace(solicitud.Detalle))
+            {
+                detalleCompleto += $"Detalles adicionales:\n{solicitud.Detalle}";
+            }
+            solicitud.Detalle = detalleCompleto;
+
+            Logger.LogInformation($"Enviando solicitud: Cliente={clienteNombre}, Fecha deseada={fechaDeseada:dd/MM/yyyy}");
+
+            var response = await Http.PostAsJsonAsync("api/solicitud", solicitud);
+
+            if (response.IsSuccessStatusCode)
+            {
+                successMessage = "¡Solicitud enviada exitosamente! Un empleado la revisará pronto.";
+                Logger.LogInformation("Solicitud creada exitosamente");
+
+                // Limpiar formulario
+                solicitud = new SolicitudServicio();
+                fechaDeseada = DateTime.Today;
+
+                // Redirigir después de 2 segundos
+                await Task.Delay(2000);
+                Navigation.NavigateTo("/cliente");
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                errorMessage = $"Error al enviar la solicitud: {error}";
+                Logger.LogError($"Error al crear solicitud: {error}");
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+            Logger.LogError(ex, "Error al enviar solicitud");
+        }
+        finally
+        {
+            enviando = false;
+        }
+    }
+}

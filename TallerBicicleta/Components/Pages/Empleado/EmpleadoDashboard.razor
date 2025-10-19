@@ -1,3 +1,150 @@
-@page "/empleado/dashboard"
-<PageTitle>Panel del Empleado</PageTitle>
-<h3>Panel del Empleado</h3>
+@page "/empleado"
+@attribute [Authorize(Roles = "Empleado")]
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject ILogger<EmpleadoDashboard> Logger
+
+<PageTitle>Panel de Empleado</PageTitle>
+
+<div class="page-container">
+    <!-- Header -->
+    <div class="page-header">
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between align-items-center py-3">
+                <div>
+                    <h1 class="mb-0">
+                        <i class="fas fa-user-tie me-2"></i>Panel de Empleado
+                    </h1>
+                    <p class="text-white-50 mb-0">Bienvenido, @nombreEmpleado</p>
+                </div>
+                <button class="btn btn-light" @onclick="CerrarSesion">
+                    <i class="fas fa-sign-out-alt me-2"></i>Cerrar Sesión
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido -->
+    <div class="container-fluid px-4 mt-4">
+        <div class="row g-4">
+            <!-- Card: Servicios Disponibles -->
+            <div class="col-md-6">
+                <div class="card shadow-lg border-0 h-100 card-hover">
+                    <div class="card-body text-center p-5">
+                        <div class="icon-wrapper bg-warning bg-opacity-10 mb-4">
+                            <i class="fas fa-clipboard-list fa-4x text-warning"></i>
+                        </div>
+                        <h3 class="card-title mb-3">Servicios Disponibles</h3>
+                        <p class="card-text text-muted mb-4">
+                            Ver solicitudes pendientes de clientes y tomar las que puedas atender
+                        </p>
+                        <button class="btn btn-warning btn-lg" @onclick='() => Navigation.NavigateTo("/empleado/servicios-disponibles")'>
+                            <i class="fas fa-search me-2"></i>Ver Disponibles
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card: Mis Servicios En Proceso -->
+            <div class="col-md-6">
+                <div class="card shadow-lg border-0 h-100 card-hover">
+                    <div class="card-body text-center p-5">
+                        <div class="icon-wrapper bg-success bg-opacity-10 mb-4">
+                            <i class="fas fa-tasks fa-4x text-success"></i>
+                        </div>
+                        <h3 class="card-title mb-3">Mis Servicios</h3>
+                        <p class="card-text text-muted mb-4">
+                            Servicios que has tomado y estás trabajando actualmente
+                        </p>
+                        <button class="btn btn-success btn-lg" @onclick='() => Navigation.NavigateTo("/empleado/mis-servicios")'>
+                            <i class="fas fa-briefcase me-2"></i>Ver Mis Servicios
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .page-container {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+    }
+
+    .page-header {
+        background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+        color: white;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .icon-wrapper {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
+    }
+
+    .card-hover {
+        transition: all 0.3s ease;
+    }
+
+        .card-hover:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.2) !important;
+        }
+
+    .btn-warning {
+        background: linear-gradient(135deg, #ffa726 0%, #fb8c00 100%);
+        border: none;
+        padding: 12px 30px;
+    }
+
+        .btn-warning:hover {
+            background: linear-gradient(135deg, #fb8c00 0%, #f57c00 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 167, 38, 0.4);
+        }
+
+    .btn-success {
+        background: linear-gradient(135deg, #66bb6a 0%, #4caf50 100%);
+        border: none;
+        padding: 12px 30px;
+    }
+
+        .btn-success:hover {
+            background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+</style>
+
+@code {
+    private string? nombreEmpleado;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            nombreEmpleado = user.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+        }
+    }
+
+    private void CerrarSesion()
+    {
+        Logger.LogInformation("Empleado cerró sesión");
+
+        if (AuthStateProvider is  CustomAuthStateProvider customAuthStateProvider)
+        {
+            customAuthStateProvider.MarkUserAsLoggedOut();
+        }
+
+        Navigation.NavigateTo("/login", true);
+    }
+}

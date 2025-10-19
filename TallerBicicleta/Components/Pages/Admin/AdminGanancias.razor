@@ -1,4 +1,393 @@
 @page "/admin/ganancias"
-<PageTitle>Ganancias</PageTitle>
-<h3>Ganancias</h3>
-<p>Resumen de ingresos y estadísticas.</p>
+@using Microsoft.JSInterop
+@using Microsoft.AspNetCore.Authorization
+@inject GananciaService GananciaService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+@attribute [Authorize(Roles = "Administrador")]
+
+<div class="container-fluid min-vh-100 bg-light py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-xl-11">
+            <!-- Header -->a
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="fw-bold text-primary mb-1">
+                        <i class="bi bi-graph-up-arrow"></i> Reporte de Ganancias
+                    </h2>
+                    <p class="text-muted mb-0">Análisis financiero del taller</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-success no-print" @onclick="ImprimirReporte">
+                        <i class="bi bi-printer"></i> Imprimir
+                    </button>
+                    <button class="btn btn-outline-secondary no-print" @onclick="Volver">
+                        <i class="bi bi-arrow-left"></i> Volver
+                    </button>
+                </div>
+            </div>
+
+            @if (cargando)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-3 text-muted">Cargando reporte...</p>
+                </div>
+            }
+            else if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i> @errorMessage
+                </div>
+            }
+            else if (reporte != null)
+            {
+                <!-- Filtro de Fecha -->
+                <div class="card shadow-sm mb-4 no-print">
+                    <div class="card-body">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Mes</label>
+                                <select class="form-select" @bind="mesSeleccionado">
+                                    <option value="0">📅 Todo el Año</option>
+                                    <option value="1">Enero</option>
+                                    <option value="2">Febrero</option>
+                                    <option value="3">Marzo</option>
+                                    <option value="4">Abril</option>
+                                    <option value="5">Mayo</option>
+                                    <option value="6">Junio</option>
+                                    <option value="7">Julio</option>
+                                    <option value="8">Agosto</option>
+                                    <option value="9">Septiembre</option>
+                                    <option value="10">Octubre</option>
+                                    <option value="11">Noviembre</option>
+                                    <option value="12">Diciembre</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Año</label>
+                                <select class="form-select" @bind="anioSeleccionado">
+                                    @for (int i = DateTime.Now.Year; i >= DateTime.Now.Year - 5; i--)
+                                    {
+                                        <option value="@i">@i</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-primary w-100" @onclick="CargarReporte">
+                                    <i class="bi bi-search"></i> Consultar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                @if (reporte.TotalFacturas == 0)
+                {
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>No hay datos para el período seleccionado.</strong><br />
+                        No se encontraron facturas para @(mesSeleccionado == 0 ? "el año " + anioSeleccionado : ObtenerNombreMes(mesSeleccionado) + " de " + anioSeleccionado).
+                        Intenta seleccionar otro período o genera facturas primero.
+                    </div>
+                }
+                else
+                {
+                    <!-- Tarjetas de Resumen -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3">
+                            <div class="card shadow-sm border-0 h-100">
+                                <div class="card-body text-center">
+                                    <div class="text-primary mb-2" style="font-size: 2rem;">
+                                        <i class="bi bi-receipt"></i>
+                                    </div>
+                                    <h6 class="text-muted mb-1">Total Facturas</h6>
+                                    <h3 class="fw-bold mb-0">@reporte.TotalFacturas</h3>
+                                    <small class="text-success">@reporte.FacturasPagadas pagadas</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card shadow-sm border-0 h-100 bg-gradient" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                                <div class="card-body text-center text-white">
+                                    <div class="mb-2" style="font-size: 2rem;">
+                                        <i class="bi bi-tools"></i>
+                                    </div>
+                                    <h6 class="mb-1 opacity-75">Servicios</h6>
+                                    <h3 class="fw-bold mb-0">@reporte.GananciaServicios.ToString("C2")</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card shadow-sm border-0 h-100 bg-success">
+                                <div class="card-body text-center text-white">
+                                    <div class="mb-2" style="font-size: 2rem;">
+                                        <i class="bi bi-box-seam"></i>
+                                    </div>
+                                    <h6 class="mb-1 opacity-75">Productos</h6>
+                                    <h3 class="fw-bold mb-0">@reporte.GananciaProductos.ToString("C2")</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card shadow-sm border-0 h-100 bg-warning">
+                                <div class="card-body text-center">
+                                    <div class="text-dark mb-2" style="font-size: 2rem;">
+                                        <i class="bi bi-person-check"></i>
+                                    </div>
+                                    <h6 class="text-dark mb-1">Comisión Empleados</h6>
+                                    <h3 class="fw-bold mb-0 text-dark">@reporte.ComisionEmpleado.ToString("C2")</h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ganancias Totales -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <div class="card shadow-sm border-0 h-100" style="border-left: 5px solid #28a745 !important;">
+                                <div class="card-body">
+                                    <h5 class="card-title text-success mb-3">
+                                        <i class="bi bi-cash-stack"></i> Ingreso Total
+                                    </h5>
+                                    <h2 class="fw-bold text-success mb-2">@reporte.TotalGanado.ToString("C2")</h2>
+                                    <p class="text-muted small mb-0">Servicios + Productos</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card shadow-sm border-0 h-100" style="border-left: 5px solid #007bff !important;">
+                                <div class="card-body">
+                                    <h5 class="card-title text-primary mb-3">
+                                        <i class="bi bi-trophy"></i> Ganancia Neta
+                                    </h5>
+                                    <h2 class="fw-bold text-primary mb-2">@reporte.GananciaNeta.ToString("C2")</h2>
+                                    <p class="text-muted small mb-0">Total - Comisiones</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gráficas -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-8">
+                            <div class="card shadow-sm">
+                                <div class="card-body">
+                                    <h5 class="card-title mb-3">
+                                        <i class="bi bi-bar-chart"></i> Distribución de Ingresos
+                                    </h5>
+                                    <canvas id="chartIngresos" style="max-height: 300px;"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card shadow-sm">
+                                <div class="card-body">
+                                    <h5 class="card-title mb-3">
+                                        <i class="bi bi-pie-chart"></i> Composición
+                                    </h5>
+                                    <canvas id="chartComposicion" style="max-height: 300px;"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Desglose Detallado -->
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">
+                                <i class="bi bi-table"></i> Desglose Detallado - @(mesSeleccionado == 0 ? "Año " + anioSeleccionado : reporte.NombreMes + " " + reporte.Anio)
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Concepto</th>
+                                        <th class="text-end">Monto</th>
+                                        <th class="text-center">% del Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>
+                                            <i class="bi bi-tools text-primary"></i>
+                                            <strong>Ingresos por Servicios</strong>
+                                        </td>
+                                        <td class="text-end fw-bold text-primary">@reporte.GananciaServicios.ToString("C2")</td>
+                                        <td class="text-center">
+                                            <span class="badge bg-primary">@(((reporte.GananciaServicios / reporte.TotalGanado) * 100).ToString("F1"))%</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <i class="bi bi-box-seam text-success"></i>
+                                            <strong>Ingresos por Productos</strong>
+                                        </td>
+                                        <td class="text-end fw-bold text-success">@reporte.GananciaProductos.ToString("C2")</td>
+                                        <td class="text-center">
+                                            <span class="badge bg-success">@(((reporte.GananciaProductos / reporte.TotalGanado) * 100).ToString("F1"))%</span>
+                                        </td>
+                                    </tr>
+                                    <tr class="table-info">
+                                        <td><strong>Subtotal</strong></td>
+                                        <td class="text-end fw-bold">@reporte.TotalGanado.ToString("C2")</td>
+                                        <td class="text-center">
+                                            <span class="badge bg-info">100%</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <i class="bi bi-person-check text-warning"></i>
+                                            <strong>Comisiones Empleados</strong>
+                                        </td>
+                                        <td class="text-end fw-bold text-warning">-@reporte.ComisionEmpleado.ToString("C2")</td>
+                                        <td class="text-center">
+                                            <span class="badge bg-warning text-dark">@(((reporte.ComisionEmpleado / reporte.TotalGanado) * 100).ToString("F1"))%</span>
+                                        </td>
+                                    </tr>
+                                    <tr class="table-primary">
+                                        <td><strong><i class="bi bi-trophy"></i> GANANCIA NETA</strong></td>
+                                        <td class="text-end fw-bold fs-5 text-primary">@reporte.GananciaNeta.ToString("C2")</td>
+                                        <td class="text-center">
+                                            <span class="badge bg-primary">@(((reporte.GananciaNeta / reporte.TotalGanado) * 100).ToString("F1"))%</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    @@media print {
+        .no-print {
+            display: none !important;
+        }
+
+        body {
+            background-color: white !important;
+        }
+
+        .card {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        h2, h3, h5 {
+            color: #000 !important;
+        }
+    }
+</style>
+
+@code {
+    private ReporteGanancias? reporte;
+    private bool cargando = true;
+    private string? errorMessage;
+    private int mesSeleccionado = 0; // 0 = Todo el año
+    private int anioSeleccionado = DateTime.Now.Year;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarReporte();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender && reporte != null)
+        {
+            await GenerarGraficas();
+        }
+    }
+
+    private async Task CargarReporte()
+    {
+        try
+        {
+            cargando = true;
+            errorMessage = null;
+
+            // Si mesSeleccionado = 0, cargar todo el año, sino cargar mes específico
+            if (mesSeleccionado == 0)
+            {
+                reporte = await GananciaService.ObtenerGananciasPorAnioAsync(anioSeleccionado);
+            }
+            else
+            {
+                reporte = await GananciaService.ObtenerGananciasPorMesAsync(mesSeleccionado, anioSeleccionado);
+            }
+
+            await Task.Delay(100); // Pequeño delay para asegurar que el DOM esté listo
+            await GenerarGraficas();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar el reporte: {ex.Message}";
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+
+    private async Task GenerarGraficas()
+    {
+        if (reporte == null) return;
+
+        try
+        {
+            // Preparar datos para las gráficas
+            var datosGraficas = new
+            {
+                gananciaServicios = reporte.GananciaServicios,
+                gananciaProductos = reporte.GananciaProductos,
+                comisionEmpleado = reporte.ComisionEmpleado,
+                gananciaNeta = reporte.GananciaNeta
+            };
+
+            // Generar gráfica de ingresos
+            await JSRuntime.InvokeVoidAsync("graficas.generarIngresos", "chartIngresos", datosGraficas);
+
+            // Generar gráfica de composición
+            await JSRuntime.InvokeVoidAsync("graficas.generarComposicion", "chartComposicion", datosGraficas);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error generando gráficas: {ex.Message}");
+        }
+    }
+
+    private void ImprimirReporte()
+    {
+        JSRuntime.InvokeVoidAsync("window.print");
+    }
+
+    private void Volver()
+    {
+        Navigation.NavigateTo("/admin");
+    }
+
+    private string ObtenerNombreMes(int mes)
+    {
+        return mes switch
+        {
+            1 => "Enero",
+            2 => "Febrero",
+            3 => "Marzo",
+            4 => "Abril",
+            5 => "Mayo",
+            6 => "Junio",
+            7 => "Julio",
+            8 => "Agosto",
+            9 => "Septiembre",
+            10 => "Octubre",
+            11 => "Noviembre",
+            12 => "Diciembre",
+            _ => "Desconocido"
+        };
+    }
+}

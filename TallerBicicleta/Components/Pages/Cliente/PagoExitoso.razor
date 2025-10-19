@@ -1,3 +1,161 @@
-@page "/cliente/pago-exitoso"
-<PageTitle>Pago Exitoso</PageTitle>
-<h3>Pago Exitoso</h3>
+@page "/pago/exitoso"
+@attribute [Authorize(Roles = "Cliente")]
+@inject NavigationManager Navigation
+@inject HttpClient Http
+@inject Services.FacturaService FacturaService
+@inject Services.AbonoService AbonoService
+
+<div class="container min-vh-100 d-flex align-items-center justify-content-center">
+    <div class="text-center">
+        @if (cargando)
+        {
+            <div class="spinner-border text-success" style="width: 4rem; height: 4rem;" role="status">
+                <span class="visually-hidden">Verificando pago...</span>
+            </div>
+            <h3 class="mt-4">Verificando tu pago...</h3>
+            <p class="text-muted">Por favor espera un momento</p>
+        }
+        else if (pagoExitoso)
+        {
+            <div class="mb-4">
+                <i class="bi bi-check-circle-fill text-success" style="font-size: 5rem;"></i>
+            </div>
+            <h1 class="text-success fw-bold mb-3">¡Pago Exitoso!</h1>
+            <h4 class="mb-4">Tu pago de <strong>@montoFormateado</strong> ha sido procesado correctamente</h4>
+
+            <div class="alert alert-success" role="alert">
+                <i class="bi bi-envelope-check"></i> Recibirás un correo electrónico con los detalles de tu pago
+            </div>
+
+            <div class="mt-4">
+                <button class="btn btn-primary btn-lg me-2" @onclick="VolverAMisFacturas">
+                    <i class="bi bi-receipt"></i> Ver Mis Facturas
+                </button>
+                <button class="btn btn-outline-secondary btn-lg" @onclick="VolverAlInicio">
+                    <i class="bi bi-house"></i> Ir al Inicio
+                </button>
+            </div>
+        }
+        else
+        {
+            <div class="mb-4">
+                <i class="bi bi-exclamation-triangle-fill text-warning" style="font-size: 5rem;"></i>
+            </div>
+            <h1 class="text-warning fw-bold mb-3">No se pudo verificar el pago</h1>
+            <p class="mb-4">@mensajeError</p>
+
+            <button class="btn btn-primary btn-lg" @onclick="VolverAMisFacturas">
+                <i class="bi bi-arrow-left"></i> Volver a Mis Facturas
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    private bool cargando = true;
+    private bool pagoExitoso = false;
+    private string mensajeError = "";
+    private double monto = 0;
+    private string montoFormateado => monto.ToString("C2");
+    private string facturaId = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var uri = new Uri(Navigation.Uri);
+            var query = QueryHelpers.ParseQuery(uri.Query);
+
+            if (query.TryGetValue("session_id", out var sessionId))
+            {
+                // Verificar el pago con Stripe
+                var response = await Http.GetAsync($"/api/pago/verificar/{sessionId}");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var resultado = await response.Content.ReadFromJsonAsync<ResultadoVerificacion>();
+
+                    if (resultado?.Exitoso == true)
+                    {
+                        pagoExitoso = true;
+                        monto = resultado.Monto;
+                        facturaId = resultado.FacturaId ?? "";
+
+                        // Registrar el abono automáticamente
+                        await RegistrarAbono();
+                    }
+                    else
+                    {
+                        mensajeError = $"El pago aún no ha sido completado. Estado: {resultado?.Estado}";
+                    }
+                }
+                else
+                {
+                    mensajeError = "Error al verificar el pago con el servidor";
+                }
+            }
+            else
+            {
+                mensajeError = "No se encontró información del pago";
+            }
+        }
+        catch (Exception ex)
+        {
+            mensajeError = $"Error al verificar el pago: {ex.Message}";
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+
+    private async Task RegistrarAbono()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(facturaId)) return;
+
+            var factura = await FacturaService.ObtenerFacturaPorIdAsync(facturaId);
+            if (factura == null) return;
+
+            // Crear el abono
+            var abono = new Models.Abono
+            {
+                Id = Guid.NewGuid().ToString(),
+                FacturaId = facturaId,
+                NumeroFactura = factura.NumeroFactura,
+                ClienteId = factura.ClienteId,
+                ClienteNombre = factura.ClienteNombre,
+                Monto = monto,
+                MetodoPago = "Stripe - Tarjeta",
+                Observaciones = "Pago procesado vía Stripe",
+                FechaAbono = DateTime.Now
+            };
+
+            await AbonoService.RegistrarAbonoAsync(abono);
+            Console.WriteLine($"Abono registrado exitosamente para factura {facturaId}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al registrar abono: {ex.Message}");
+        }
+    }
+
+    private void VolverAMisFacturas()
+    {
+        Navigation.NavigateTo("/cliente/mis-facturas");
+    }
+
+    private void VolverAlInicio()
+    {
+        Navigation.NavigateTo("/cliente");
+    }
+
+    private class ResultadoVerificacion
+    {
+        public bool Exitoso { get; set; }
+        public string Estado { get; set; } = "";
+        public double Monto { get; set; }
+        public string? FacturaId { get; set; }
+    }
+}

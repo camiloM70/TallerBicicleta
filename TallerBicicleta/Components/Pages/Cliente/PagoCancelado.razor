@@ -1,3 +1,62 @@
-@page "/cliente/pago-cancelado"
-<PageTitle>Pago Cancelado</PageTitle>
-<h3>Pago Cancelado</h3>
+@page "/pago/cancelado"
+@attribute [Authorize(Roles = "Cliente")]
+@inject NavigationManager Navigation
+
+<div class="container min-vh-100 d-flex align-items-center justify-content-center">
+    <div class="text-center">
+        <div class="mb-4">
+            <i class="bi bi-x-circle-fill text-danger" style="font-size: 5rem;"></i>
+        </div>
+        <h1 class="text-danger fw-bold mb-3">Pago Cancelado</h1>
+        <h4 class="mb-4">Has cancelado el proceso de pago</h4>
+
+        <div class="alert alert-info" role="alert">
+            <i class="bi bi-info-circle"></i> No se realizó ningún cargo a tu método de pago
+        </div>
+
+        <p class="mb-4 text-muted">
+            Si deseas completar el pago más tarde, puedes hacerlo desde tu lista de facturas pendientes
+        </p>
+
+        <div class="mt-4">
+            <button class="btn btn-primary btn-lg me-2" @onclick="IntentarNuevamente">
+                <i class="bi bi-arrow-repeat"></i> Intentar Nuevamente
+            </button>
+            <button class="btn btn-outline-secondary btn-lg" @onclick="VolverAMisFacturas">
+                <i class="bi bi-receipt"></i> Ver Mis Facturas
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string? facturaId;
+
+    protected override void OnInitialized()
+    {
+        var uri = new Uri(Navigation.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("facturaId", out var id))
+        {
+            facturaId = id;
+        }
+    }
+
+    private void IntentarNuevamente()
+    {
+        if (!string.IsNullOrEmpty(facturaId))
+        {
+            Navigation.NavigateTo($"/cliente/mis-facturas");
+        }
+        else
+        {
+            Navigation.NavigateTo("/cliente/mis-facturas");
+        }
+    }
+
+    private void VolverAMisFacturas()
+    {
+        Navigation.NavigateTo("/cliente/mis-facturas");
+    }
+}

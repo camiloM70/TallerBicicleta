@@ -1,7 +1,20 @@
-﻿
-<Router AppAssembly="typeof(Program).Assembly">
-    <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
-        <FocusOnNavigate RouteData="routeData" Selector="h1" />
-    </Found>
-</Router>
+﻿@inject NavigationManager Navigation
+<CascadingAuthenticationState>
+    <Router AppAssembly="typeof(Program).Assembly">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)">
+                
+            </AuthorizeRouteView>
+        </Found>
+    </Router>
+@*     @code {
+        private RenderFragment RedirectT0Login() => builder =>
+        {
+            Navigation.NavigateTo("/", true);
+        };
+        private RenderFragment RedirectToError() => builder =>
+        {
+            Navigation.NavigateTo("/Error", true);
+		};
+	} *@
+</CascadingAuthenticationState>

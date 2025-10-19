@@ -1,3 +1,330 @@
-@page "/cliente/mis-facturas"
-<PageTitle>Mis Facturas</PageTitle>
-<h3>Listado de Facturas</h3>
+﻿@page "/cliente/facturas"
+@attribute [Authorize(Roles = "Cliente")]
+@inject HttpClient Http
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject ILogger<MisFacturas> Logger
+
+<div class="container-fluid min-vh-100 bg-light py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-xl-10">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="fw-bold text-primary mb-1"> Mis Facturas</h2>
+                    <p class="text-muted mb-0">Historial de servicios y pagos</p>
+                </div>
+                <button class="btn btn-outline-secondary" @onclick="Volver">
+                    <i class="bi bi-arrow-left"></i> Volver
+                </button>
+            </div>
+
+            @if (cargando)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <p class="mt-3 text-muted">Cargando facturas...</p>
+                </div>
+            }
+            else if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i> @errorMessage
+                </div>
+            }
+            else if (!facturas.Any())
+            {
+                <div class="card shadow-sm">
+                    <div class="card-body text-center py-5">
+                        <i class="bi bi-receipt text-muted" style="font-size: 4rem;"></i>
+                        <h5 class="mt-3 text-muted">No tienes facturas registradas</h5>
+                        <p class="text-muted">Las facturas de tus servicios aparecerán aquí</p>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <!-- Estadísticas rápidas -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <div class="card shadow-sm border-0 bg-primary text-white">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <p class="mb-1 opacity-75">Total Facturas</p>
+                                        <h3 class="mb-0 fw-bold">@facturas.Count</h3>
+                                    </div>
+                                    <i class="bi bi-receipt" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card shadow-sm border-0 bg-success text-white">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <p class="mb-1 opacity-75">Pagadas</p>
+                                        <h3 class="mb-0 fw-bold">@facturas.Count(f => f.Pagada)</h3>
+                                    </div>
+                                    <i class="bi bi-check-circle" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card shadow-sm border-0 bg-warning text-white">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <p class="mb-1 opacity-75">Pendientes</p>
+                                        <h3 class="mb-0 fw-bold">@facturas.Count(f => !f.Pagada)</h3>
+                                    </div>
+                                    <i class="bi bi-clock-history" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lista de facturas -->
+                <div class="row g-3">
+                    @foreach (var factura in facturas)
+                    {
+                        <div class="col-12">
+                            <div class="card shadow-sm border-0 hover-shadow">
+                                <div class="card-body">
+                                    <div class="row align-items-center">
+                                        <!-- Info principal -->
+                                        <div class="col-md-8">
+                                            <div class="d-flex align-items-start mb-2">
+                                                <div class="flex-grow-1">
+                                                    <h5 class="mb-1 fw-bold text-primary">
+                                                        <i class="bi bi-receipt"></i> @factura.NumeroFactura
+                                                    </h5>
+                                                    <p class="text-muted mb-2 small">
+                                                        <i class="bi bi-calendar3"></i> @factura.FechaEmision.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                                    </p>
+                                                </div>
+                                                <span class="badge @(factura.Pagada ? "bg-success" : "bg-warning text-dark") px-3 py-2">
+                                                    @if (factura.Pagada)
+                                                    {
+                                                        <i class="bi bi-check-circle"></i>
+                                                        <text> PAGADA</text>
+                                                    }
+                                                    else
+                                                    {
+                                                        <i class="bi bi-clock"></i>
+                                                        <text> PENDIENTE</text>
+                                                    }
+                                                </span>
+                                            </div>
+
+                                            <div class="mb-2">
+                                                <p class="mb-1"><strong>👨‍🔧 Empleado:</strong> @factura.EmpleadoNombre</p>
+                                                <p class="mb-1"><strong>🔧 Servicio:</strong> @factura.ServicioNombre</p>
+                                                <p class="mb-1">
+                                                    <strong>📦 Productos:</strong>
+                                                    @if (factura.Detalles != null && factura.Detalles.Any())
+                                                    {
+                                                        @string.Join(", ", factura.Detalles.Select(d => $"{d.ProductoNombre} (x{d.Cantidad})"))
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted">Sin productos</span>
+                                                    }
+                                                </p>
+                                            </div>
+
+                                            <div class="d-flex gap-3 mt-3">
+                                                <div>
+                                                    <small class="text-muted">Total:</small>
+                                                    <p class="mb-0 fw-bold text-dark">@factura.Total.ToString("C2")</p>
+                                                </div>
+                                                @if (!factura.Pagada)
+                                                {
+                                                    <div>
+                                                        <small class="text-muted">Saldo Pendiente:</small>
+                                                        <p class="mb-0 fw-bold text-danger">@factura.Saldo.ToString("C2")</p>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+
+                                        <!-- Acciones -->
+                                        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                                            <div class="d-flex flex-column gap-2">
+                                                <button class="btn btn-outline-primary btn-sm"
+                                                        @onclick="() => VerDetalles(factura.Id)">
+                                                    <i class="bi bi-eye"></i> Ver Detalles
+                                                </button>
+
+                                                @if (!factura.Pagada)
+                                                {
+                                                    <button class="btn btn-success btn-sm"
+                                                            @onclick="() => PagarAhora(factura.Id)">
+                                                        <i class="bi bi-credit-card-2-front"></i> Pagar Ahora
+                                                    </button>
+                                                    <button class="btn btn-outline-success btn-sm"
+                                                            @onclick="() => IrAbonar(factura.Id)">
+                                                        <i class="bi bi-credit-card"></i> Abonar
+                                                    </button>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    .hover-shadow {
+        transition: all 0.3s ease;
+    }
+
+        .hover-shadow:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+        }
+</style>
+
+@code {
+    private List<Factura> facturas = new List<Factura>();
+    private bool cargando = true;
+    private string? errorMessage;
+    private string? clienteId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                clienteId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+                if (!string.IsNullOrEmpty(clienteId))
+                {
+                    await CargarFacturas();
+                }
+                else
+                {
+                    errorMessage = "No se pudo obtener el ID del cliente";
+                }
+            }
+            else
+            {
+                Navigation.NavigateTo("/login");
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar: {ex.Message}";
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+
+    private async Task CargarFacturas()
+    {
+        try
+        {
+            var response = await Http.GetAsync($"api/factura/cliente/{clienteId}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                facturas = await response.Content.ReadFromJsonAsync<List<Factura>>() ?? new List<Factura>();
+            }
+            else
+            {
+                errorMessage = "Error al cargar facturas";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    private void VerDetalles(string? facturaId)
+    {
+        if (!string.IsNullOrEmpty(facturaId))
+        {
+            Navigation.NavigateTo($"/cliente/factura/{facturaId}");
+        }
+    }
+
+    private void IrAbonar(string? facturaId)
+    {
+        if (!string.IsNullOrEmpty(facturaId))
+        {
+            Navigation.NavigateTo($"/cliente/abonar/{facturaId}");
+        }
+    }
+
+    private async Task PagarAhora(string? facturaId)
+    {
+        if (string.IsNullOrEmpty(facturaId)) return;
+
+        try
+        {
+            // Obtener el correo del usuario autenticado
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            var correo = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? "";
+
+            if (string.IsNullOrEmpty(correo))
+            {
+                // Si no tiene correo en los claims, intentar obtenerlo de otro lado
+                correo = "cliente@ejemplo.com"; // Puedes mejorar esto
+            }
+
+            // Crear sesión de pago
+            var response = await Http.PostAsJsonAsync($"/api/pago/crear-sesion/{facturaId}", new { CorreoCliente = correo });
+
+            if (response.IsSuccessStatusCode)
+            {
+                var resultado = await response.Content.ReadFromJsonAsync<ResultadoSesion>();
+
+                if (!string.IsNullOrEmpty(resultado?.Url))
+                {
+                    // Redirigir a Stripe
+                    Navigation.NavigateTo(resultado.Url, forceLoad: true);
+                }
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Logger.LogError($"Error al crear sesión de pago: {error}");
+                errorMessage = $"Error al crear el pago. Intenta de nuevo.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError($"Excepción al crear sesión de pago: {ex.Message}\nStackTrace: {ex.StackTrace}");
+            errorMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    private class ResultadoSesion
+    {
+        public string Url { get; set; } = "";
+    }
+
+    private void Volver()
+    {
+        Navigation.NavigateTo("/cliente");
+    }
+}

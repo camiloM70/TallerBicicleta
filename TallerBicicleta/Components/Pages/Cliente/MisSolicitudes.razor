@@ -1,3 +1,254 @@
 @page "/cliente/mis-solicitudes"
+@attribute [Authorize(Roles = "Cliente")]
+@inject HttpClient Http
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject ILogger<MisSolicitudes> Logger
+
 <PageTitle>Mis Solicitudes</PageTitle>
-<h3>Solicitudes del Cliente</h3>
+
+<div class="page-container">
+    <!-- Header -->
+    <div class="page-header">
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between align-items-center py-3">
+                <div>
+                    <button class="btn btn-light btn-sm me-3" @onclick='() => Navigation.NavigateTo("/cliente")'>
+                        <i class="fas fa-arrow-left me-2"></i>Volver
+                    </button>
+                    <h1 class="d-inline mb-0">
+                        <i class="fas fa-list-alt me-2"></i>Mis Solicitudes
+                    </h1>
+                </div>
+                <button class="btn btn-primary btn-sm" @onclick='() => Navigation.NavigateTo("/cliente/solicitar-servicio")'>
+                    <i class="fas fa-plus me-2"></i>Nueva Solicitud
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido -->
+    <div class="container-fluid px-4 mt-4">
+        @if (cargando)
+        {
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;"></div>
+                <p class="mt-3">Cargando solicitudes...</p>
+            </div>
+        }
+        else if (solicitudes == null || !solicitudes.Any())
+        {
+            <div class="card shadow-lg border-0">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
+                    <h4>No tienes solicitudes de servicio</h4>
+                    <p class="text-muted">Solicita un servicio para comenzar</p>
+                    <button class="btn btn-primary" @onclick='() => Navigation.NavigateTo("/cliente/solicitar-servicio")'>
+                        <i class="fas fa-plus me-2"></i>Solicitar Servicio
+                    </button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="row">
+                @foreach (var solicitud in solicitudes.OrderByDescending(s => s.FechaSolicitud))
+                {
+                    <div class="col-md-6 col-lg-4 mb-4">
+                        <div class="card h-100 shadow border-0 solicitud-card">
+                            <div class="card-header @GetEstadoClass(solicitud.EstadoSolicitud) text-white">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0">
+                                        <span class="badge bg-dark me-2">#@solicitud.Id?.Substring(0, 8)</span>
+                                        @solicitud.ServicioNombre
+                                    </h5>
+                                    <span class="badge bg-light text-dark">@GetEstadoTexto(solicitud.EstadoSolicitud)</span>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="card-text mb-2">
+                                    <i class="fas fa-hashtag text-secondary me-2"></i>
+                                    <strong>ID:</strong> <code class="text-muted small">@solicitud.Id</code>
+                                </p>
+
+                                <p class="card-text">
+                                    <i class="fas fa-calendar-alt text-primary me-2"></i>
+                                    <strong>Solicitado:</strong> @solicitud.FechaSolicitud.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                </p>
+
+                                @if (solicitud.EmpleadoNombre != null)
+                                {
+                                    <p class="card-text">
+                                        <i class="fas fa-user-tie text-success me-2"></i>
+                                        <strong>Empleado:</strong> @solicitud.EmpleadoNombre
+                                    </p>
+                                }
+
+                                <p class="card-text">
+                                    <i class="fas fa-align-left text-info me-2"></i>
+                                    <strong>Descripción:</strong>
+                                </p>
+                                <p class="text-muted small">@solicitud.Descripcion</p>
+
+                                @if (!string.IsNullOrEmpty(solicitud.Detalle))
+                                {
+                                    <p class="card-text">
+                                        <i class="fas fa-info-circle text-warning me-2"></i>
+                                        <strong>Detalles:</strong>
+                                    </p>
+                                    <p class="text-muted small">@solicitud.Detalle</p>
+                                }
+
+                                @if (solicitud.EstadoSolicitud == EstadoSolicitud.Completada && solicitud.FechaCompletada.HasValue)
+                                {
+                                    <div class="alert alert-success mb-0 mt-2">
+                                        <i class="fas fa-check-circle me-2"></i>
+                                        Completado el @solicitud.FechaCompletada.Value.ToLocalTime().ToString("dd/MM/yyyy")
+                                    </div>
+                                }
+                                else if (solicitud.EstadoSolicitud == EstadoSolicitud.EnProceso)
+                                {
+                                    <div class="alert alert-info mb-0 mt-2">
+                                        <i class="fas fa-cog fa-spin me-2"></i>
+                                        En proceso...
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .page-container {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #e0f7fa 0%, #80deea 100%);
+    }
+
+    .page-header {
+        background: linear-gradient(135deg, #00acc1 0%, #00838f 100%);
+        color: white;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+        .page-header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: white;
+        }
+
+    .solicitud-card {
+        transition: transform 0.3s, box-shadow 0.3s;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+        .solicitud-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
+        }
+
+    .estado-pendiente {
+        background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+    }
+
+    .estado-enproceso {
+        background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+    }
+
+    .estado-completada {
+        background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+    }
+
+    .estado-cancelada {
+        background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+    }
+</style>
+
+@code {
+    private List<SolicitudServicio>? solicitudes;
+    private bool cargando = true;
+    private string? clienteId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ObtenerClienteId();
+        await CargarSolicitudes();
+    }
+
+    private async Task ObtenerClienteId()
+    {
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                clienteId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                Logger.LogInformation($"Cliente ID: {clienteId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error al obtener ID del cliente");
+        }
+    }
+
+    private async Task CargarSolicitudes()
+    {
+        try
+        {
+            cargando = true;
+
+            // Obtener todas las solicitudes y filtrar por cliente
+            var response = await Http.GetAsync("api/solicitud");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var todasLasSolicitudes = await response.Content.ReadFromJsonAsync<List<SolicitudServicio>>();
+                solicitudes = todasLasSolicitudes?.Where(s => s.ClienteId == clienteId).ToList();
+                Logger.LogInformation($"Solicitudes del cliente cargadas: {solicitudes?.Count ?? 0}");
+            }
+            else
+            {
+                Logger.LogError($"Error al cargar solicitudes: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error al cargar solicitudes");
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+
+    private string GetEstadoClass(EstadoSolicitud estado)
+    {
+        return estado switch
+        {
+            EstadoSolicitud.Pendiente => "estado-pendiente",
+            EstadoSolicitud.EnProceso => "estado-enproceso",
+            EstadoSolicitud.Completada => "estado-completada",
+            EstadoSolicitud.Cancelada => "estado-cancelada",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetEstadoTexto(EstadoSolicitud estado)
+    {
+        return estado switch
+        {
+            EstadoSolicitud.Pendiente => "Pendiente",
+            EstadoSolicitud.EnProceso => "En Proceso",
+            EstadoSolicitud.Completada => "Completada",
+            EstadoSolicitud.Cancelada => "Cancelada",
+            _ => "Desconocido"
+        };
+    }
+}

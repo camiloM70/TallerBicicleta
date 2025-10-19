@@ -1,3 +1,157 @@
-@page "/cliente/dashboard"
-<PageTitle>Panel del Cliente</PageTitle>
-<h3>Panel del Cliente</h3>
+@page "/cliente"
+@attribute [Authorize(Roles = "Cliente")]
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject ILogger<ClienteDashboard> Logger
+
+<PageTitle>Panel de Cliente</PageTitle>
+
+<div class="cliente-container">
+    <!-- Header con cerrar sesión -->
+    <div class="cliente-header">
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between align-items-center py-3">
+                <h1 class="mb-0">
+                    <i class="fas fa-user me-3"></i>Panel de Cliente
+                </h1>
+                <AuthorizeView>
+                    <Authorized>
+                        <div class="d-flex align-items-center">
+                            <span class="text-white me-3 fw-bold">
+                                <i class="fas fa-user-circle me-2"></i>@context.User.Identity?.Name
+                            </span>
+                            <button class="btn btn-light btn-sm" @onclick="CerrarSesion">
+                                <i class="fas fa-sign-out-alt me-1"></i>Cerrar Sesión
+                            </button>
+                        </div>
+                    </Authorized>
+                </AuthorizeView>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido principal -->
+    <div class="container-fluid mt-5 px-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <p class="lead text-center">Bienvenido a tu panel de cliente</p>
+            </div>
+        </div>
+
+        <div class="row g-4 justify-content-center">
+            <!-- Card Mis Solicitudes -->
+            <div class="col-md-4">
+                <div class="card text-white bg-warning shadow-lg h-100">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <h3 class="card-title mb-2">Mis Solicitudes</h3>
+                                <p class="card-text fs-5">Ver estado</p>
+                            </div>
+                            <i class="fas fa-clipboard-list fa-4x opacity-50"></i>
+                        </div>
+                        <p class="mb-3">Consulta el estado de tus solicitudes de servicio.</p>
+                        <button class="btn btn-light btn-lg w-100" @onclick='() => Navigation.NavigateTo("/cliente/mis-solicitudes")'>
+                            <i class="fas fa-arrow-right me-2"></i>VER SOLICITUDES
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card Mis Facturas -->
+            <div class="col-md-4">
+                <div class="card text-white bg-info shadow-lg h-100">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <h3 class="card-title mb-2">Mis Facturas</h3>
+                                <p class="card-text fs-5">Ver facturas</p>
+                            </div>
+                            <i class="fas fa-file-invoice-dollar fa-4x opacity-50"></i>
+                        </div>
+                        <p class="mb-3">Consulta el estado de tus facturas, pagos realizados y saldos pendientes.</p>
+                        <button class="btn btn-light btn-lg w-100" @onclick='() => Navigation.NavigateTo("/cliente/facturas")'>
+                            <i class="fas fa-arrow-right me-2"></i>VER MIS FACTURAS
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card Abonar -->
+            <div class="col-md-4">
+                <div class="card text-white bg-success shadow-lg h-100">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <h3 class="card-title mb-2">Abonar</h3>
+                                <p class="card-text fs-5">Realizar pago</p>
+                            </div>
+                            <i class="fas fa-money-bill-wave fa-4x opacity-50"></i>
+                        </div>
+                        <p class="mb-3">Realiza pagos parciales o totales a tus facturas pendientes.</p>
+                        <button class="btn btn-light btn-lg w-100" @onclick='() => Navigation.NavigateTo("/cliente/abonar")'>
+                            <i class="fas fa-arrow-right me-2"></i>HACER ABONO
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .cliente-container {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #e0f7fa 0%, #80deea 100%);
+    }
+
+    .cliente-header {
+        background: linear-gradient(135deg, #00acc1 0%, #00838f 100%);
+        color: white;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+        .cliente-header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+    .card {
+        transition: transform 0.3s, box-shadow 0.3s;
+        border: none;
+    }
+
+        .card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.3) !important;
+        }
+
+    .btn-light {
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+
+        .btn-light:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+</style>
+
+@code {
+    private void CerrarSesion()
+    {
+        try
+        {
+            if (AuthStateProvider is CustomAuthStateProvider customProvider)
+            {
+                customProvider.MarkUserAsLoggedOut();
+                Logger.LogInformation("Cliente cerró sesión");
+                Navigation.NavigateTo("/login", forceLoad: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error al cerrar sesión");
+        }
+    }
+}

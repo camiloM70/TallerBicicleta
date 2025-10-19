@@ -1,3 +1,515 @@
-@page "/empleado/generar-factura"
+@page "/empleado/generar-factura/{solicitudId}"
+@attribute [Authorize(Roles = "Empleado")]
+@inject HttpClient Http
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject ILogger<GenerarFactura> Logger
+
 <PageTitle>Generar Factura</PageTitle>
-<h3>Generar Factura</h3>
+
+<div class="page-container">
+    <!-- Header -->
+    <div class="page-header">
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between align-items-center py-3">
+                <div>
+                    <button class="btn btn-light btn-sm me-3" @onclick='() => Navigation.NavigateTo("/empleado/mis-servicios")'>
+                        <i class="fas fa-arrow-left me-2"></i>Volver
+                    </button>
+                    <h1 class="d-inline mb-0">
+                        <i class="fas fa-file-invoice-dollar me-2"></i>Generar Factura
+                    </h1>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido -->
+    <div class="container-fluid px-4 mt-4">
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible fade show">
+                <i class="fas fa-exclamation-circle me-2"></i>@errorMessage
+                <button type="button" class="btn-close" @onclick="@(() => errorMessage = null)"></button>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="alert alert-success alert-dismissible fade show">
+                <i class="fas fa-check-circle me-2"></i>@successMessage
+                <button type="button" class="btn-close" @onclick="@(() => successMessage = null)"></button>
+            </div>
+        }
+
+        @if (cargando)
+        {
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;"></div>
+                <p class="mt-3">Cargando información...</p>
+            </div>
+        }
+        else if (solicitud != null)
+        {
+            <div class="row">
+                <!-- Información del Servicio -->
+                <div class="col-md-4 mb-4">
+                    <div class="card shadow border-0 h-100">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Información del Servicio</h5>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>ID Solicitud:</strong><br /><code class="small">@solicitud.Id</code></p>
+                            <p><strong>Cliente:</strong><br />@solicitud.ClienteNombre</p>
+                            <p><strong>Descripción:</strong><br /><small class="text-muted">@solicitud.Descripcion</small></p>
+                            @if (!string.IsNullOrEmpty(solicitud.Detalle))
+                            {
+                                <p><strong>Detalles:</strong><br /><small class="text-muted" style="white-space: pre-line;">@solicitud.Detalle</small></p>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Formulario Principal -->
+                <div class="col-md-8">
+                    <div class="card shadow border-0 mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="fas fa-wrench me-2"></i>Descripción del Trabajo Realizado</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <label class="form-label fw-bold">Descripción del Servicio</label>
+                                    <textarea class="form-control" rows="3" @bind="descripcionServicio"
+                                              placeholder="Describe el trabajo que realizaste (ej: Reparación de motor, cambio de aceite, etc.)"></textarea>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold">Valor del Trabajo</label>
+                                    <div class="input-group input-group-lg">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" class="form-control" min="0" step="0.01"
+                                               @bind="precioServicio" @bind:event="oninput"
+                                               @onchange="CalcularTotales"
+                                               placeholder="0.00" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Agregar Productos -->
+                    <div class="card shadow border-0 mb-4">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="fas fa-box me-2"></i>Productos Utilizados</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Producto</label>
+                                    <select class="form-select" @bind="productoSeleccionadoId">
+                                        <option value="">-- Seleccione un producto --</option>
+                                        @foreach (var producto in productos)
+                                        {
+                                            <option value="@producto.Id">@producto.Nombre - $@producto.Precio.ToString("N2") (Stock: @producto.Stock)</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label fw-bold">Cantidad</label>
+                                    <input type="number" class="form-control" min="1" @bind="cantidadProducto" />
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label fw-bold">&nbsp;</label>
+                                    <button class="btn btn-success w-100" @onclick="AgregarProducto">
+                                        <i class="fas fa-plus me-2"></i>Agregar
+                                    </button>
+                                </div>
+                            </div>
+
+                            @if (detalles.Any())
+                            {
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Producto</th>
+                                                <th class="text-center">Cantidad</th>
+                                                <th class="text-end">Precio Unit.</th>
+                                                <th class="text-end">Subtotal</th>
+                                                <th class="text-center">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var detalle in detalles)
+                                            {
+                                                <tr>
+                                                    <td>@detalle.ProductoNombre</td>
+                                                    <td class="text-center">@detalle.Cantidad</td>
+                                                    <td class="text-end">$@detalle.PrecioUnitario.ToString("N2")</td>
+                                                    <td class="text-end fw-bold">$@detalle.Subtotal.ToString("N2")</td>
+                                                    <td class="text-center">
+                                                        <button class="btn btn-sm btn-danger" @onclick="() => EliminarProducto(detalle)">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>No se han agregado productos. Agrega al menos un producto utilizado.
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Resumen de Totales -->
+                    <div class="card shadow border-0 mb-4">
+                        <div class="card-header bg-dark text-white">
+                            <h5 class="mb-0"><i class="fas fa-calculator me-2"></i>Resumen de Totales</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-end">
+                                <div class="col-8">
+                                    <h6>Servicio:</h6>
+                                </div>
+                                <div class="col-4">
+                                    <h6>$@precioServicio.ToString("N2")</h6>
+                                </div>
+                            </div>
+                            <div class="row text-end">
+                                <div class="col-8">
+                                    <h6>Subtotal Productos:</h6>
+                                </div>
+                                <div class="col-4">
+                                    <h6>$@subtotalProductos.ToString("N2")</h6>
+                                </div>
+                            </div>
+                            <div class="row text-end">
+                                <div class="col-8">
+                                    <h6>Comisión Empleado (@(porcentajeComision * 100)%):</h6>
+                                </div>
+                                <div class="col-4">
+                                    <h6 class="text-success">$@comisionEmpleado.ToString("N2")</h6>
+                                </div>
+                            </div>
+                            <hr />
+                            <div class="row text-end">
+                                <div class="col-8">
+                                    <h4 class="fw-bold">TOTAL A PAGAR (Cliente):</h4>
+                                </div>
+                                <div class="col-4">
+                                    <h4 class="fw-bold text-primary">$@totalFactura.ToString("N2")</h4>
+                                </div>
+                            </div>
+                            <small class="text-muted">* La comisión es para el empleado, no se cobra al cliente</small>
+                        </div>
+                    </div>
+
+                    <!-- Botón Generar -->
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary btn-lg" @onclick="CrearFactura" disabled="@generando">
+                            @if (generando)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            else
+                            {
+                                <i class="fas fa-file-invoice me-2"></i>
+                            }
+                            Generar Factura
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .page-container {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    }
+
+    .page-header {
+        background: linear-gradient(135deg, #1976d2 0%, #0d47a1 100%);
+        color: white;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #42a5f5 0%, #2196f3 100%);
+        border: none;
+    }
+
+        .btn-primary:hover:not(:disabled) {
+            background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(33, 150, 243, 0.4);
+        }
+</style>
+
+@code {
+    [Parameter]
+    public string? SolicitudId { get; set; }
+
+    private SolicitudServicio? solicitud;
+    private List<Servicio> servicios = new();
+    private List<Producto> productos = new();
+    private List<DetalleFactura> detalles = new();
+
+    private string descripcionServicio = string.Empty;
+    private string? productoSeleccionadoId;
+    private int cantidadProducto = 1;
+
+    private double precioServicio = 0;
+    private double subtotalProductos = 0;
+    private double comisionEmpleado = 0;
+    private double totalFactura = 0;
+    private double porcentajeComision = 0;
+
+    private string? empleadoId;
+    private string? empleadoNombre;
+
+    private bool cargando = true;
+    private bool generando = false;
+    private string? errorMessage;
+    private string? successMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ObtenerDatosEmpleado();
+        await CargarDatos();
+    }
+
+    private async Task ObtenerDatosEmpleado()
+    {
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                empleadoId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                empleadoNombre = user.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+
+                // Obtener porcentaje de comisión del empleado
+                if (!string.IsNullOrEmpty(empleadoId))
+                {
+                    var response = await Http.GetAsync($"api/empleado/{empleadoId}");
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var empleado = await response.Content.ReadFromJsonAsync<Empleado>();
+                        porcentajeComision = empleado?.PorcentajeComision ?? 0.80;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error al obtener datos del empleado");
+        }
+    }
+
+    private async Task CargarDatos()
+    {
+        try
+        {
+            cargando = true;
+
+            // Cargar solicitud
+            var solicitudResponse = await Http.GetAsync($"api/solicitud/{SolicitudId}");
+            if (solicitudResponse.IsSuccessStatusCode)
+            {
+                solicitud = await solicitudResponse.Content.ReadFromJsonAsync<SolicitudServicio>();
+            }
+
+            // Cargar servicios
+            var serviciosResponse = await Http.GetAsync("api/servicio");
+            if (serviciosResponse.IsSuccessStatusCode)
+            {
+                servicios = await serviciosResponse.Content.ReadFromJsonAsync<List<Servicio>>() ?? new();
+            }
+
+            // Cargar productos
+            var productosResponse = await Http.GetAsync("api/producto");
+            if (productosResponse.IsSuccessStatusCode)
+            {
+                productos = await productosResponse.Content.ReadFromJsonAsync<List<Producto>>() ?? new();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al cargar datos: {ex.Message}";
+            Logger.LogError(ex, "Error al cargar datos");
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+
+    private void AgregarProducto()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(productoSeleccionadoId))
+            {
+                errorMessage = "Seleccione un producto";
+                return;
+            }
+
+            if (cantidadProducto <= 0)
+            {
+                errorMessage = "La cantidad debe ser mayor a cero";
+                return;
+            }
+
+            var producto = productos.FirstOrDefault(p => p.Id == productoSeleccionadoId);
+            if (producto == null)
+            {
+                errorMessage = "Producto no encontrado";
+                return;
+            }
+
+            if (cantidadProducto > producto.Stock)
+            {
+                errorMessage = $"Stock insuficiente. Disponible: {producto.Stock}";
+                return;
+            }
+
+            // Verificar si ya existe
+            var detalleExistente = detalles.FirstOrDefault(d => d.ProductoId == producto.Id);
+            if (detalleExistente != null)
+            {
+                detalleExistente.Cantidad += cantidadProducto;
+                detalleExistente.CalcularSubtotal();
+            }
+            else
+            {
+                var detalle = new DetalleFactura
+                {
+                    ProductoId = producto.Id!,
+                    ProductoNombre = producto.Nombre,
+                    Cantidad = cantidadProducto,
+                    PrecioUnitario = producto.Precio
+                };
+                detalle.CalcularSubtotal();
+                detalles.Add(detalle);
+            }
+
+            // Limpiar
+            productoSeleccionadoId = null;
+            cantidadProducto = 1;
+            errorMessage = null;
+
+            CalcularTotales();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    private void EliminarProducto(DetalleFactura detalle)
+    {
+        detalles.Remove(detalle);
+        CalcularTotales();
+    }
+
+    private void CalcularTotales()
+    {
+        // Calcular subtotal de productos
+        subtotalProductos = detalles.Sum(d => d.Subtotal);
+
+        // Calcular total para el cliente (Servicio + Productos)
+        totalFactura = precioServicio + subtotalProductos;
+
+        // Calcular comisión del empleado (sobre el total)
+        comisionEmpleado = totalFactura * porcentajeComision;
+    }
+
+    private async Task CrearFactura()
+    {
+        try
+        {
+            generando = true;
+            errorMessage = null;
+            successMessage = null;
+
+            // Validaciones
+            if (string.IsNullOrWhiteSpace(descripcionServicio))
+            {
+                errorMessage = "Debe escribir la descripción del servicio realizado";
+                return;
+            }
+
+            if (precioServicio <= 0)
+            {
+                errorMessage = "Debe ingresar el valor del trabajo realizado";
+                return;
+            }
+
+            if (!detalles.Any())
+            {
+                errorMessage = "Debe agregar al menos un producto utilizado";
+                return;
+            }
+
+            // Crear factura
+            var factura = new Factura
+            {
+                NumeroFactura = $"F-{DateTime.Now:yyyyMMddHHmmss}",
+                ClienteId = solicitud!.ClienteId,
+                ClienteNombre = solicitud.ClienteNombre,
+                EmpleadoId = empleadoId!,
+                EmpleadoNombre = empleadoNombre,
+                SolicitudId = SolicitudId!,
+                ServicioNombre = descripcionServicio,
+                PrecioServicio = precioServicio,
+                Detalles = detalles,
+                SubtotalProductos = subtotalProductos,
+                ComisionEmpleado = comisionEmpleado,
+                Total = totalFactura,
+                Saldo = totalFactura,
+                Pagada = false,
+                FechaEmision = DateTime.UtcNow
+            };
+
+            // Guardar factura
+            var response = await Http.PostAsJsonAsync("api/factura", factura);
+
+            if (response.IsSuccessStatusCode)
+            {
+                // Completar solicitud
+                await Http.PutAsync($"api/solicitud/{SolicitudId}/completar", null);
+
+                successMessage = "¡Factura generada exitosamente!";
+                Logger.LogInformation($"Factura generada: {factura.NumeroFactura}");
+
+                await Task.Delay(2000);
+                Navigation.NavigateTo("/empleado/mis-servicios");
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                errorMessage = $"Error al generar factura: {error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+            Logger.LogError(ex, "Error al generar factura");
+        }
+        finally
+        {
+            generando = false;
+        }
+    }
+}
