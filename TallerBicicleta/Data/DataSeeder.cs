@@ -1,20 +1,12 @@
-﻿using TallerBicicleta.Services;
-
-namespace TallerBicicleta.Data
+﻿namespace TallerBicicleta.Data
 {
     /// <summary>
     /// Servicio para inicializar datos por defecto en la aplicación
     /// </summary>
-    public class DataSeeder
+    public class DataSeeder(AuthService authService, ILogger<DataSeeder> logger)
     {
-        private readonly AuthService _authService;
-        private readonly ILogger<DataSeeder> _logger;
-
-        public DataSeeder(AuthService authService, ILogger<DataSeeder> logger)
-        {
-            _authService = authService;
-            _logger = logger;
-        }
+        private readonly AuthService _authService = authService;
+        private readonly ILogger<DataSeeder> _logger = logger;
 
         /// <summary>
         /// Crea el usuario administrador por defecto si no existe

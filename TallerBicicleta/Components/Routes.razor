@@ -1,20 +1,31 @@
 ﻿@inject NavigationManager Navigation
+
 <CascadingAuthenticationState>
-    <Router AppAssembly="typeof(Program).Assembly">
+    <Router AppAssembly="@typeof(Program).Assembly">
         <Found Context="routeData">
-            <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)">
-                
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                <NotAuthorized>
+                    @RedirectToLogin()
+                </NotAuthorized>
+                <Authorizing>
+                    <p>Cargando autenticación...</p>
+                </Authorizing>
             </AuthorizeRouteView>
         </Found>
+        <NotFound>
+            @RedirectToError()
+        </NotFound>
     </Router>
-@*     @code {
-        private RenderFragment RedirectT0Login() => builder =>
+
+    @code {
+        private RenderFragment RedirectToLogin() => builder =>
         {
-            Navigation.NavigateTo("/", true);
+            Navigation.NavigateTo("/login", true);
         };
+
         private RenderFragment RedirectToError() => builder =>
         {
-            Navigation.NavigateTo("/Error", true);
-		};
-	} *@
+            Navigation.NavigateTo("/error", true);
+        };
+    }
 </CascadingAuthenticationState>

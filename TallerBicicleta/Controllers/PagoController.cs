@@ -1,4 +1,6 @@
-﻿namespace TallerBicicleta.Controllers
+﻿using Stripe;
+
+namespace TallerBicicleta.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
@@ -141,8 +143,7 @@
         {
             try
             {
-                var sesion = evento.Data.Object as Stripe.Checkout.Session;
-                if (sesion == null) return;
+                if (evento.Data.Object is not Stripe.Checkout.Session sesion) return;
 
                 var facturaId = sesion.Metadata["facturaId"];
                 var monto = (double)(sesion.AmountTotal ?? 0) / 100;

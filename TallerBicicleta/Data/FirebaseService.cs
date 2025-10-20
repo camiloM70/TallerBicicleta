@@ -1,6 +1,4 @@
-﻿using Google.Cloud.Firestore;
-
-namespace TallerBicicleta.Data
+﻿namespace TallerBicicleta.Data
 {
     public class FirebaseService
     {
