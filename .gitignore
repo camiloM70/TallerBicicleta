@@ -10,8 +10,8 @@ obj/
 *.suo
 
 # Archivos de configuración local
-#appsettings.Development.json
-#launchSettings.json
+appsettings.Development.json
+launchSettings.json
 
 # Dependencias
 node_modules/
