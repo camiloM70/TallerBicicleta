@@ -9,9 +9,9 @@ obj/
 *.user
 *.suo
 
-# Archivos de configuración local
-appsettings.Development.json
-launchSettings.json
+# Archivos de configuraciÃ³n local
+#appsettings.Development.json
+#launchSettings.json
 
 # Dependencias
 node_modules/
