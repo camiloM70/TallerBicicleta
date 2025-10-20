@@ -4,24 +4,16 @@ namespace TallerBicicleta.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class PagoController : ControllerBase
+    public class PagoController(
+        StripePaymentService stripeService,
+        FacturaService facturaService,
+        AbonoService abonoService,
+        ILogger<PagoController> logger) : ControllerBase
     {
-        private readonly StripePaymentService _stripeService;
-        private readonly FacturaService _facturaService;
-        private readonly AbonoService _abonoService;
-        private readonly ILogger<PagoController> _logger;
-
-        public PagoController(
-            StripePaymentService stripeService,
-            FacturaService facturaService,
-            AbonoService abonoService,
-            ILogger<PagoController> logger)
-        {
-            _stripeService = stripeService;
-            _facturaService = facturaService;
-            _abonoService = abonoService;
-            _logger = logger;
-        }
+        private readonly StripePaymentService _stripeService = stripeService;
+        private readonly FacturaService _facturaService = facturaService;
+        private readonly AbonoService _abonoService = abonoService;
+        private readonly ILogger<PagoController> _logger = logger;
 
         [HttpPost("crear-sesion/{facturaId}")]
         public async Task<IActionResult> CrearSesionPago(string facturaId, [FromBody] DatosPagoRequest request)

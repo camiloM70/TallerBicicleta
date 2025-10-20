@@ -2,16 +2,10 @@
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class AbonoController : ControllerBase
+    public class AbonoController(AbonoService abonoService, ILogger<AbonoController> logger) : ControllerBase
     {
-        private readonly AbonoService _abonoService;
-        private readonly ILogger<AbonoController> _logger;
-
-        public AbonoController(AbonoService abonoService, ILogger<AbonoController> logger)
-        {
-            _abonoService = abonoService;
-            _logger = logger;
-        }
+        private readonly AbonoService _abonoService = abonoService;
+        private readonly ILogger<AbonoController> _logger = logger;
 
         /// <summary>
         /// GET: api/abono/factura/{facturaId}
@@ -75,10 +69,10 @@
         }
 
         /// <summary>
-        /// POST: api/abono
+        /// POST: api/abono/registrar
         /// Registra un nuevo abono
         /// </summary>
-        [HttpPost]
+        [HttpPost("registrar")]
         public async Task<ActionResult<Abono>> RegistrarAbono([FromBody] Abono abono)
         {
             try

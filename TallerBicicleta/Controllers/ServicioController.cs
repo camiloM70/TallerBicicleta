@@ -3,22 +3,16 @@
 
     [ApiController]
     [Route("api/[controller]")]
-    public class ServicioController : ControllerBase
+    public class ServicioController(ServicioService servicioService, ILogger<ServicioController> logger) : ControllerBase
     {
-        private readonly ServicioService _servicioService;
-        private readonly ILogger<ServicioController> _logger;
-
-        public ServicioController(ServicioService servicioService, ILogger<ServicioController> logger)
-        {
-            _servicioService = servicioService;
-            _logger = logger;
-        }
+        private readonly ServicioService _servicioService = servicioService;
+        private readonly ILogger<ServicioController> _logger = logger;
 
         /// <summary>
         /// GET: api/servicio
         /// Obtiene todos los servicios activos
         /// </summary>
-        [HttpGet]
+        [HttpGet("")]
         public async Task<ActionResult<List<Servicio>>> ObtenerServicios()
         {
             try
@@ -60,7 +54,7 @@
         /// POST: api/servicio
         /// Crea un nuevo servicio
         /// </summary>
-        [HttpPost]
+        [HttpPost("")]
         public async Task<ActionResult<Servicio>> CrearServicio([FromBody] Servicio servicio)
         {
             try

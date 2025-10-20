@@ -2,22 +2,16 @@
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class ProductoController : ControllerBase
+    public class ProductoController(ProductoService productoService, ILogger<ProductoController> logger) : ControllerBase
     {
-        private readonly ProductoService _productoService;
-        private readonly ILogger<ProductoController> _logger;
-
-        public ProductoController(ProductoService productoService, ILogger<ProductoController> logger)
-        {
-            _productoService = productoService;
-            _logger = logger;
-        }
+        private readonly ProductoService _productoService = productoService;
+        private readonly ILogger<ProductoController> _logger = logger;
 
         /// <summary>
         /// GET: api/producto
         /// Obtiene todos los productos activos
         /// </summary>
-        [HttpGet]
+        [HttpGet("")]
         public async Task<ActionResult<List<Producto>>> ObtenerProductos()
         {
             try
@@ -59,7 +53,7 @@
         /// POST: api/producto
         /// Crea un nuevo producto
         /// </summary>
-        [HttpPost]
+        [HttpPost("")]
         public async Task<ActionResult<Producto>> CrearProducto([FromBody] Producto producto)
         {
             try

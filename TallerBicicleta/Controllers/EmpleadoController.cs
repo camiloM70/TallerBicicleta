@@ -5,23 +5,17 @@
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]
-    public class EmpleadoController : ControllerBase
+    public class EmpleadoController(EmpleadoService empleadoService, ILogger<EmpleadoController> logger) : ControllerBase
     {
-        private readonly EmpleadoService _empleadoService;
-        private readonly ILogger<EmpleadoController> _logger;
-
-        public EmpleadoController(EmpleadoService empleadoService, ILogger<EmpleadoController> logger)
-        {
-            _empleadoService = empleadoService;
-            _logger = logger;
-        }
+        private readonly EmpleadoService _empleadoService = empleadoService;
+        private readonly ILogger<EmpleadoController> _logger = logger;
 
         /// <summary>
         /// Obtiene todos los empleados activos
         /// GET: api/empleado
         /// </summary>
         /// <returns>Lista de empleados</returns>
-        [HttpGet]
+        [HttpGet("")]
         [ProducesResponseType(typeof(List<Empleado>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<List<Empleado>>> GetEmpleados()
@@ -79,7 +73,7 @@
         /// </summary>
         /// <param name="empleado">Datos del empleado a crear</param>
         /// <returns>Empleado creado</returns>
-        [HttpPost]
+        [HttpPost("")]
         [ProducesResponseType(typeof(Empleado), StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]

@@ -2,22 +2,16 @@
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class SolicitudController : ControllerBase
+    public class SolicitudController(SolicitudService solicitudService, ILogger<SolicitudController> logger) : ControllerBase
     {
-        private readonly SolicitudService _solicitudService;
-        private readonly ILogger<SolicitudController> _logger;
-
-        public SolicitudController(SolicitudService solicitudService, ILogger<SolicitudController> logger)
-        {
-            _solicitudService = solicitudService;
-            _logger = logger;
-        }
+        private readonly SolicitudService _solicitudService = solicitudService;
+        private readonly ILogger<SolicitudController> _logger = logger;
 
         /// <summary>
         /// GET: api/solicitud
         /// Obtiene todas las solicitudes
         /// </summary>
-        [HttpGet]
+        [HttpGet("")]
         public async Task<ActionResult<List<SolicitudServicio>>> ObtenerSolicitudes()
         {
             try
@@ -116,7 +110,7 @@
         /// POST: api/solicitud
         /// Crea una nueva solicitud de servicio
         /// </summary>
-        [HttpPost]
+        [HttpPost("")]
         public async Task<ActionResult<SolicitudServicio>> CrearSolicitud([FromBody] SolicitudServicio solicitud)
         {
             try

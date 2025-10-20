@@ -2,16 +2,10 @@
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class AuthController : ControllerBase
+    public class AuthController(AuthService authService, ILogger<AuthController> logger) : ControllerBase
     {
-        private readonly AuthService _authService;
-        private readonly ILogger<AuthController> _logger;
-
-        public AuthController(AuthService authService, ILogger<AuthController> logger)
-        {
-            _authService = authService;
-            _logger = logger;
-        }
+        private readonly AuthService _authService = authService;
+        private readonly ILogger<AuthController> _logger = logger;
 
         /// <summary>
         /// POST: api/auth/login

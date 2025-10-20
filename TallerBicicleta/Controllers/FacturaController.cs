@@ -2,27 +2,20 @@
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class FacturaController : ControllerBase
+    public class FacturaController(
+        FacturaService facturaService,
+        EmailService emailService,
+        ILogger<FacturaController> logger) : ControllerBase
     {
-        private readonly FacturaService _facturaService;
-        private readonly EmailService _emailService;
-        private readonly ILogger<FacturaController> _logger;
-
-        public FacturaController(
-            FacturaService facturaService,
-            EmailService emailService,
-            ILogger<FacturaController> logger)
-        {
-            _facturaService = facturaService;
-            _emailService = emailService;
-            _logger = logger;
-        }
+        private readonly FacturaService _facturaService = facturaService;
+        private readonly EmailService _emailService = emailService;
+        private readonly ILogger<FacturaController> _logger = logger;
 
         /// <summary>
         /// GET: api/factura
         /// Obtiene todas las facturas
         /// </summary>
-        [HttpGet]
+        [HttpGet("")]
         public async Task<ActionResult<List<Factura>>> ObtenerFacturas()
         {
             try
@@ -83,7 +76,7 @@
         /// POST: api/factura
         /// Crea una nueva factura directamente
         /// </summary>
-        [HttpPost]
+        [HttpPost("")]
         public async Task<ActionResult<Factura>> CrearFactura([FromBody] Factura factura)
         {
             try
